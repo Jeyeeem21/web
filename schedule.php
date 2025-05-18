@@ -1,3 +1,6 @@
+
+<!-- schedule.php -->
+
 <div id="schedule">
     <h2 class="text-2xl font-semibold text-gray-800 mb-6">Appointment Schedule</h2>
     <div class="grid grid-cols-1 lg:grid-cols-7 gap-4">

@@ -1,3 +1,5 @@
+<!-- settings.php -->
+
 <div id="settings">
     <h2 class="text-2xl font-semibold text-gray-800 mb-6">Settings</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">

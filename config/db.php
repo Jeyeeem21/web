@@ -1,3 +1,5 @@
+<!-- ../config/db.php -->
+
 <?php
 // Database connection configuration
 $host = 'localhost';
