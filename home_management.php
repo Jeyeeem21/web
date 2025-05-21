@@ -285,7 +285,7 @@ $aboutContents = $stmt->fetchAll();
     
         <!-- Home Content Table -->
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200" id="homeTable">
             <thead>
                 <tr>
                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Image</th>
@@ -350,7 +350,7 @@ $aboutContents = $stmt->fetchAll();
         
         <!-- About Content Table -->
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200" id="aboutTable">
                 <thead>
                     <tr>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
@@ -468,6 +468,62 @@ $aboutContents = $stmt->fetchAll();
 </div>
 
 <script>
+$(document).ready(function() {
+    // Common DataTable configuration
+    const commonConfig = {
+        responsive: true,
+        language: {
+            search: "",
+            searchPlaceholder: "Search...",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            paginate: {
+                first: "«",
+                last: "»",
+                next: "›",
+                previous: "‹"
+            }
+        },
+        dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"<"mb-4 md:mb-0"l><"flex items-center"f>>rtip',
+        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+        pageLength: 10,
+        scrollX: false,
+        autoWidth: false,
+        drawCallback: function() {
+            // Custom pagination styling
+            $('.dataTables_paginate').addClass('flex justify-center mt-4');
+            $('.paginate_button').addClass('px-2 py-1 mx-0.5 rounded text-xs cursor-pointer');
+            $('.paginate_button.current').addClass('bg-primary-600 text-white');
+            $('.paginate_button:not(.current)').addClass('bg-gray-100 text-gray-700 hover:bg-gray-200');
+            $('.paginate_button.disabled').addClass('opacity-50 cursor-not-allowed');
+            
+            // Ensure clickable area for next/previous buttons
+            $('.paginate_button.next, .paginate_button.previous').addClass('px-3');
+            
+            // Custom length menu styling
+            $('.dataTables_length select').addClass('rounded-md border-gray-300 text-sm');
+            
+            // Custom search box styling
+            $('.dataTables_filter input').addClass('rounded-md border-gray-300 text-sm');
+        }
+    };
+
+    // Initialize DataTables with common configuration
+    $('#homeTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
+    });
+
+    $('#aboutTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
+    });
+});
+
     // Home Content Functions
     function openAddHomeModal() {
         document.getElementById('homeModalTitle').textContent = 'Add Home Content';

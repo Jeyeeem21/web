@@ -1,16 +1,22 @@
 <?php
-// Prevent any output buffering
-ob_clean();
+// Enable error logging
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', 'D:/xampp/htdocs/Clinic/logs/php_errors.log');
 
 // Include database connection
 require_once 'config/db.php';
 
 // Set proper headers for JSON response
 header('Content-Type: application/json');
+header('Cache-Control: no-cache, must-revalidate');
 
 // Function to send JSON response
 function sendJsonResponse($data) {
-    ob_clean(); // Clear any output buffers
+    // Clear any output buffers
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     echo json_encode($data);
     exit();
 }
@@ -76,6 +82,21 @@ if (isset($_GET['action'])) {
             $stmt->execute([$id]);
             sendJsonResponse(['success' => true]);
         } catch (PDOException $e) {
+            sendJsonResponse(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    // Handle delete schedule action
+    if ($_GET['action'] == 'delete_schedule' && isset($_GET['id'])) {
+        $id = $_GET['id'];
+        try {
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("DELETE FROM doctor_schedule WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $pdo->commit();
+            sendJsonResponse(['success' => true]);
+        } catch (Exception $e) {
+            $pdo->rollBack();
             sendJsonResponse(['success' => false, 'error' => $e->getMessage()]);
         }
     }

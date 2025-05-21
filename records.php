@@ -613,12 +613,12 @@ try {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    
+
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700">Username</label>
                         <input type="text" name="username" id="addUserUsername" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
-                    
+
                     <div class="mb-4 relative">
                         <label class="block text-sm font-medium text-gray-700">Password</label>
                         <input type="password" name="password" id="addUserPassword" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 pr-10">
@@ -629,7 +629,7 @@ try {
                             </svg>
                         </button>
                     </div>
-                    
+
                     <div class="flex justify-end space-x-2">
                         <button type="button" onclick="closeAddUserModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
                         <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Create Account</button>
@@ -786,7 +786,8 @@ document.getElementById('togglePassword')?.addEventListener('click', function() 
 });
 
 $(document).ready(function() {
-    $('#patientsTable').DataTable({
+    // Common DataTable configuration
+    const commonConfig = {
         responsive: true,
         language: {
             search: "",
@@ -794,20 +795,49 @@ $(document).ready(function() {
             lengthMenu: "Show _MENU_ entries",
             info: "Showing _START_ to _END_ of _TOTAL_ entries",
             paginate: {
-                first: "First",
-                last: "Last",
-                next: "Next",
-                previous: "Previous"
+                first: "«",
+                last: "»",
+                next: "›",
+                previous: "‹"
             }
         },
         dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"<"mb-4 md:mb-0"l><"flex items-center"f>>rtip',
         lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
         pageLength: 10,
+        scrollX: false,
+        autoWidth: false,
+        drawCallback: function() {
+            // Custom pagination styling
+            $('.dataTables_paginate').addClass('flex justify-center mt-4');
+            $('.paginate_button').addClass('px-2 py-1 mx-0.5 rounded text-xs cursor-pointer');
+            $('.paginate_button.current').addClass('bg-primary-600 text-white');
+            $('.paginate_button:not(.current)').addClass('bg-gray-100 text-gray-700 hover:bg-gray-200');
+            $('.paginate_button.disabled').addClass('opacity-50 cursor-not-allowed');
+            
+            // Ensure clickable area for next/previous buttons
+            $('.paginate_button.next, .paginate_button.previous').addClass('px-3');
+            
+            // Custom length menu styling
+            $('.dataTables_length select').addClass('rounded-md border-gray-300 text-sm');
+            
+            // Custom search box styling
+            $('.dataTables_filter input').addClass('rounded-md border-gray-300 text-sm');
+        }
+    };
+
+    // Initialize DataTables with common configuration
+    $('#patientsTable').DataTable({
+        ...commonConfig,
         columnDefs: [
             { orderable: false, targets: -1 }
-        ],
-        scrollX: false,
-        autoWidth: false
+        ]
+    });
+
+    $('#patientUsersTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
     });
 });
 
@@ -858,31 +888,6 @@ function deleteUser(id) {
         });
     }
 }
-
-// Initialize DataTable for patient users
-$(document).ready(function() {
-    $('#patientUsersTable').DataTable({
-        responsive: true,
-        language: {
-            search: "",
-            searchPlaceholder: "Search...",
-            lengthMenu: "Show _MENU_ entries",
-            info: "Showing _START_ to _END_ of _TOTAL_ entries",
-            paginate: {
-                first: "First",
-                last: "Last",
-                next: "Next",
-                previous: "Previous"
-            }
-        },
-        dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"<"mb-4 md:mb-0"l><"flex items-center"f>>rtip',
-        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-        pageLength: 10,
-        columnDefs: [
-            { orderable: false, targets: -1 }
-        ]
-    });
-});
 
 // Edit User Modal Functions
 function openEditUserModal(id, username, patientId) {

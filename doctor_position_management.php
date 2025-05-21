@@ -1,4 +1,6 @@
+
 <?php
+//doctoc_position
 // Start output buffering to prevent "headers already sent" errors
 ob_start();
 
@@ -134,13 +136,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
     // Service actions
     if (in_array($_POST['action'], ['add_service', 'edit_service', 'update_price'])) {
         if ($_POST['action'] == 'add_service') {
-            $service_name = $_POST['service_name'] ?? '';
-            $service_description = $_POST['service_description'] ?? '';
-            $price = $_POST['price'] ?? 0.00;
+            $service_name = trim($_POST['service_name'] ?? '');
+            $service_description = trim($_POST['service_description'] ?? '');
+            $price = floatval($_POST['price'] ?? 0.00);
+            $time = trim($_POST['time'] ?? '');
+            $kind_of_doctor = trim($_POST['kind_of_doctor'] ?? '');
             $status = 1;
             $created_at = date('Y-m-d H:i:s');
             $service_picture = '';
 
+            // Validate required fields
+            if (empty($service_name) || empty($service_description) || empty($kind_of_doctor)) {
+                $error = "All fields are required.";
+            } else {
             // Handle file upload
             if (isset($_FILES['service_picture']) && $_FILES['service_picture']['error'] == 0) {
                 $upload_dir = 'Uploads/services/';
@@ -159,14 +167,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             }
 
             // Insert into database
-            $sql = "INSERT INTO services (service_name, service_description, service_picture, price, status, created_at) 
-                    VALUES (:service_name, :service_description, :service_picture, :price, :status, :created_at)";
+                $sql = "INSERT INTO services (service_name, service_description, service_picture, price, time, kind_of_doctor, status, created_at) 
+                        VALUES (:service_name, :service_description, :service_picture, :price, :time, :kind_of_doctor, :status, :created_at)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':service_name' => $service_name,
                 ':service_description' => $service_description,
                 ':service_picture' => $service_picture,
                 ':price' => $price,
+                    ':time' => $time,
+                    ':kind_of_doctor' => $kind_of_doctor,
                 ':status' => $status,
                 ':created_at' => $created_at
             ]);
@@ -174,15 +184,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             // Redirect to prevent form resubmission
             header("Location: index.php?page=doctor_position_management&success=service_added");
             exit();
+            }
         }
 
         if ($_POST['action'] == 'edit_service') {
             $id = $_POST['id'];
-            $service_name = $_POST['service_name'] ?? '';
-            $service_description = $_POST['service_description'] ?? '';
-            $price = $_POST['price'] ?? 0.00;
+            $service_name = trim($_POST['service_name'] ?? '');
+            $service_description = trim($_POST['service_description'] ?? '');
+            $price = floatval($_POST['price'] ?? 0.00);
+            $time = trim($_POST['time'] ?? '');
+            $kind_of_doctor = trim($_POST['kind_of_doctor'] ?? '');
             $service_picture = $_POST['existing_picture'] ?? '';
+            $status = 1;
+            $created_at = date('Y-m-d H:i:s');
 
+            // Validate required fields
+            if (empty($service_name) || empty($service_description) || empty($kind_of_doctor)) {
+                $error = "All fields are required.";
+            } else {
             // Handle file upload for edit
             if (isset($_FILES['service_picture']) && $_FILES['service_picture']['error'] == 0) {
                 $upload_dir = 'Uploads/services/';
@@ -206,24 +225,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
 
             // Update database
             $sql = "UPDATE services SET service_name = :service_name, service_description = :service_description, 
-                    service_picture = :service_picture, price = :price WHERE id = :id";
+                        service_picture = :service_picture, price = :price, time = :time, kind_of_doctor = :kind_of_doctor, 
+                        status = :status, created_at = :created_at WHERE id = :id";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':id' => $id,
                 ':service_name' => $service_name,
                 ':service_description' => $service_description,
                 ':service_picture' => $service_picture,
-                ':price' => $price
+                    ':price' => $price,
+                    ':time' => $time,
+                    ':kind_of_doctor' => $kind_of_doctor,
+                    ':status' => $status,
+                    ':created_at' => $created_at
             ]);
 
             // Redirect to prevent form resubmission
             header("Location: index.php?page=doctor_position_management&success=service_updated");
             exit();
+            }
         }
 
         if ($_POST['action'] == 'update_price') {
             $id = $_POST['id'];
-            $price = $_POST['price'] ?? 0.00;
+            $price = floatval($_POST['price'] ?? 0.00);
 
             // Update price in database
             $sql = "UPDATE services SET price = :price WHERE id = :id";
@@ -332,16 +357,16 @@ try {
 
             <!-- Doctor Table -->
             <div class="overflow-x-auto">
-                <table id="doctorTable" class="min-w-full divide-y divide-gray-200 mobile-card-view">
-                    <thead>
+                <table id="doctorTable" class="min-w-full divide-y divide-gray-200 border-separate border-spacing-0 mobile-card-view">
+                    <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Position</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Description</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Created Date</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($positions as $position): ?>
                         <tr id="position-row-<?php echo $position['id']; ?>" class="hover:bg-gray-50">
                             <td class="px-4 py-2">
@@ -419,18 +444,19 @@ try {
 
             <!-- Service Table -->
             <div class="overflow-x-auto">
-                <table id="serviceTable" class="min-w-full divide-y divide-gray-200 mobile-card-view">
-                    <thead>
+                <table id="serviceTable" class="min-w-full divide-y divide-gray-200 border-separate border-spacing-0 mobile-card-view">
+                    <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Picture</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service Name</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Picture</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Service Name</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Description</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Duration</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Price</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Kind of Doctor</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($services as $service): ?>
                         <tr id="service-row-<?php echo $service['id']; ?>" class="hover:bg-gray-50">
                             <td class="px-4 py-2">
@@ -449,6 +475,9 @@ try {
                                 <div class="text-sm text-gray-900 truncate max-w-xs"><?php echo htmlspecialchars(substr($service['service_description'], 0, 50)) . (strlen($service['service_description']) > 50 ? '...' : ''); ?></div>
                             </td>
                             <td class="px-4 py-2">
+                                <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['time']); ?></div>
+                            </td>
+                            <td class="px-4 py-2">
                                 <div class="text-sm text-gray-900 flex items-center space-x-2">
                                     <span id="price-<?php echo $service['id']; ?>">₱<?php echo number_format($service['price'], 2); ?></span>
                                     <button type="button" class="text-green-600 hover:text-green-800" onclick="openPriceModal(<?php echo $service['id']; ?>, <?php echo $service['price']; ?>)">
@@ -458,12 +487,12 @@ try {
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-4 py-2 whitespace-nowrap">
-                                <div class="text-sm text-gray-900"><?php echo date('M d, Y H:i', strtotime($service['created_at'])); ?></div>
+                            <td class="px-4 py-2">
+                                <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['kind_of_doctor']); ?></div>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm">
                                 <div class="flex space-x-1">
-                                    <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditServiceModal(<?php echo $service['id']; ?>, '<?php echo addslashes($service['service_name']); ?>', '<?php echo addslashes($service['service_description']); ?>', '<?php echo addslashes($service['service_picture']); ?>', <?php echo $service['price']; ?>)">
+                                    <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditServiceModal(<?php echo $service['id']; ?>, '<?php echo addslashes($service['service_name']); ?>', '<?php echo addslashes($service['service_description']); ?>', '<?php echo addslashes($service['service_picture']); ?>', <?php echo $service['price']; ?>, '<?php echo addslashes($service['time']); ?>', '<?php echo addslashes($service['kind_of_doctor']); ?>')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
@@ -513,6 +542,35 @@ try {
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700">Price (₱)</label>
                             <input type="number" step="10.0" name="price" id="servicePrice" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Duration</label>
+                            <select name="time" id="serviceTime" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="">Select Duration</option>
+                                <option value="30 minutes">30 minutes</option>
+                                <option value="1 hour">1 hour</option>
+                                <option value="2 hours">2 hours</option>
+                                <option value="3 hours">3 hours</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Kind of Doctor</label>
+                            <select name="kind_of_doctor" id="serviceKindOfDoctor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                                <option value="">Select Doctor Position</option>
+                                <?php 
+                                // Get all active doctor positions
+                                $stmt = $pdo->query("SELECT * FROM doctor_position WHERE status = 1 ORDER BY doctor_position ASC");
+                                $doctorPositions = $stmt->fetchAll();
+                                foreach ($doctorPositions as $position): 
+                                    $positionName = htmlspecialchars($position['doctor_position']);
+                                ?>
+                                    <option value="<?php echo $positionName; ?>">
+                                        <?php echo $positionName; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
 
                         <div class="flex justify-end space-x-2">
@@ -628,7 +686,7 @@ function openAddServiceModal() {
     document.getElementById('serviceModal').classList.remove('hidden');
 }
 
-function openEditServiceModal(id, name, description, picture, price) {
+function openEditServiceModal(id, name, description, picture, price, time, kind_of_doctor) {
     document.getElementById('serviceModalTitle').textContent = 'Edit Service';
     document.getElementById('serviceForm').action.value = 'edit_service';
     document.getElementById('serviceId').value = id;
@@ -636,6 +694,18 @@ function openEditServiceModal(id, name, description, picture, price) {
     document.getElementById('serviceDescription').value = description;
     document.getElementById('existingPicture').value = picture;
     document.getElementById('servicePrice').value = price;
+    document.getElementById('serviceTime').value = time;
+    
+    // Set the selected option in the Kind of Doctor dropdown
+    const kindOfDoctorSelect = document.getElementById('serviceKindOfDoctor');
+    const options = kindOfDoctorSelect.options;
+    for (let i = 0; i < options.length; i++) {
+        if (options[i].value === kind_of_doctor) {
+            kindOfDoctorSelect.selectedIndex = i;
+            break;
+        }
+    }
+    
     document.getElementById('servicePicture').required = false;
     if (picture) {
         document.getElementById('currentImage').classList.remove('hidden');
@@ -674,7 +744,8 @@ function deleteService(id) {
 }
 
 $(document).ready(function() {
-    $('.mobile-card-view').DataTable({
+    // Common DataTable configuration
+    const commonConfig = {
         responsive: true,
         language: {
             search: "",
@@ -682,20 +753,49 @@ $(document).ready(function() {
             lengthMenu: "Show _MENU_ entries",
             info: "Showing _START_ to _END_ of _TOTAL_ entries",
             paginate: {
-                first: "First",
-                last: "Last",
-                next: "Next",
-                previous: "Previous"
+                first: "«",
+                last: "»",
+                next: "›",
+                previous: "‹"
             }
         },
         dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"<"mb-4 md:mb-0"l><"flex items-center"f>>rtip',
         lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
         pageLength: 10,
+        scrollX: false,
+        autoWidth: false,
+        drawCallback: function() {
+            // Custom pagination styling
+            $('.dataTables_paginate').addClass('flex justify-center mt-4');
+            $('.paginate_button').addClass('px-2 py-1 mx-0.5 rounded text-xs cursor-pointer');
+            $('.paginate_button.current').addClass('bg-primary-600 text-white');
+            $('.paginate_button:not(.current)').addClass('bg-gray-100 text-gray-700 hover:bg-gray-200');
+            $('.paginate_button.disabled').addClass('opacity-50 cursor-not-allowed');
+            
+            // Ensure clickable area for next/previous buttons
+            $('.paginate_button.next, .paginate_button.previous').addClass('px-3');
+            
+            // Custom length menu styling
+            $('.dataTables_length select').addClass('rounded-md border-gray-300 text-sm');
+            
+            // Custom search box styling
+            $('.dataTables_filter input').addClass('rounded-md border-gray-300 text-sm');
+        }
+    };
+
+    // Initialize DataTables with common configuration
+    $('#doctorTable').DataTable({
+        ...commonConfig,
         columnDefs: [
             { orderable: false, targets: -1 }
-        ],
-        scrollX: false,
-        autoWidth: false
+        ]
+    });
+
+    $('#serviceTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
     });
 
     // Handle price form submission

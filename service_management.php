@@ -178,16 +178,16 @@ $services = $stmt->fetchAll();
                 <tbody class="divide-y divide-gray-200">
                     <?php foreach ($services as $service): ?>
                     <tr id="service-row-<?php echo $service['id']; ?>" class="hover:bg-gray-50">
-                        <td class="px-4 py-2">
+                        <td class="px-4 py-2" data-label="Service Name">
                             <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['service_name']); ?></div>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-4 py-2" data-label="Description">
                             <div class="text-sm text-gray-900 truncate max-w-xs"><?php echo htmlspecialchars(substr($service['service_description'], 0, 50)) . (strlen($service['service_description']) > 50 ? '...' : ''); ?></div>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-4 py-2" data-label="Picture">
                             <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['service_picture']); ?></div>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-4 py-2" data-label="Price">
                             <div class="text-sm text-gray-900 flex items-center space-x-2">
                                 <span id="price-<?php echo $service['id']; ?>">$<?php echo number_format($service['price'], 2); ?></span>
                                 <button type="button" class="text-green-600 hover:text-green-800" onclick="openPriceModal(<?php echo $service['id']; ?>, <?php echo $service['price']; ?>)">
@@ -197,10 +197,10 @@ $services = $stmt->fetchAll();
                                 </button>
                             </div>
                         </td>
-                        <td class="px-4 py-2 whitespace-nowrap">
+                        <td class="px-4 py-2 whitespace-nowrap" data-label="Created Date">
                             <div class="text-sm text-gray-900"><?php echo date('M d, Y H:i', strtotime($service['created_at'])); ?></div>
                         </td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm">
+                        <td class="px-4 py-2 whitespace-nowrap text-sm" data-label="Actions">
                             <div class="flex space-x-1">
                                 <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditModal(<?php echo $service['id']; ?>, '<?php echo addslashes($service['service_name']); ?>', '<?php echo addslashes($service['service_description']); ?>', '<?php echo addslashes($service['service_picture']); ?>', <?php echo $service['price']; ?>)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,6 +220,108 @@ $services = $stmt->fetchAll();
             </table>
         </div>
     </div>
+
+    <!-- Add mobile card view styles -->
+    <style>
+    /* Mobile-friendly styles */
+    @media (max-width: 640px) {
+        .mobile-card-view thead {
+            display: none;
+        }
+        
+        .mobile-card-view tbody tr {
+            display: block;
+            margin-bottom: 0.25rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.25rem;
+            padding: 0.25rem;
+            background-color: white;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        
+        .mobile-card-view tbody td {
+            display: flex;
+            padding: 0.125rem 0;
+            border-bottom: 1px solid #f3f4f6;
+            align-items: center;
+            min-height: 20px;
+        }
+        
+        .mobile-card-view tbody td:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        
+        .mobile-card-view tbody td:first-child {
+            padding-top: 0;
+        }
+        
+        .mobile-card-view tbody td:before {
+            content: attr(data-label);
+            font-weight: 600;
+            width: 35%;
+            color: #4b5563;
+            font-size: 0.7rem;
+            line-height: 1;
+        }
+        
+        .mobile-card-view tbody td > div {
+            width: 65%;
+            font-size: 0.7rem;
+            color: #1f2937;
+            line-height: 1;
+        }
+
+        /* Adjust specific columns */
+        .mobile-card-view tbody td[data-label="Description"] > div {
+            max-height: 20px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mobile-card-view tbody td[data-label="Actions"] > div {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .mobile-card-view tbody td[data-label="Actions"] button svg {
+            width: 0.875rem;
+            height: 0.875rem;
+        }
+        
+        /* DataTables mobile adjustments */
+        .dataTables_length, 
+        .dataTables_filter, 
+        .dataTables_info, 
+        .dataTables_paginate {
+            width: 100%;
+            margin-bottom: 0.25rem;
+            text-align: center;
+            font-size: 0.7rem;
+        }
+
+        /* Ensure consistent spacing between cards */
+        .mobile-card-view tbody tr + tr {
+            margin-top: 0.25rem;
+        }
+
+        /* Adjust table container */
+        .overflow-x-auto {
+            margin: 0 -0.25rem;
+            padding: 0 0.25rem;
+        }
+    }
+
+    /* Modal overlay for mobile */
+    @media (max-width: 640px) {
+        .fixed.inset-0 > div {
+            width: 90% !important;
+            max-width: none !important;
+            margin: 0 auto;
+        }
+    }
+    </style>
 
     <!-- Service Modal -->
     <div id="serviceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
