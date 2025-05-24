@@ -567,29 +567,24 @@ try {
 } catch (PDOException $e) {
     $error = "Error fetching appointment counts: " . $e->getMessage();
 }
-
-// Previous and next month links
-$prevMonth = $month - 1;
-$prevYear = $year;
-if ($prevMonth < 1) {
-    $prevMonth = 12;
-    $prevYear--;
-}
-
-$nextMonth = $month + 1;
-$nextYear = $year;
-if ($nextMonth > 12) {
-    $nextMonth = 1;
-    $nextYear++;
-}
 ?>
 
-<div id="schedule" class="space-y-6">
-    <h2 class="text-2xl font-semibold text-gray-800 mb-6">Appointment Schedule</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Schedule</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="bg-neutral-light font-body">
+<div id="schedule" class="space-y-8 p-6 md:p-8 animate-fade-in bg-white">
+    <h2 class="text-2xl md:text-3xl font-heading font-bold text-primary-500">Appointment Schedule</h2>
     
     <!-- Success/Error Message -->
     <?php if (isset($_GET['success']) || $error || $success): ?>
-    <div id="alert" class="bg-<?php echo $error ? 'red' : 'green'; ?>-50 border border-<?php echo $error ? 'red' : 'green'; ?>-200 text-<?php echo $error ? 'red' : 'green'; ?>-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
+    <div id="alert" class="bg-<?php echo $error ? 'red-100 border-red-200 text-red-800' : 'success-light border-success text-success'; ?> border px-4 py-3 rounded-xl text-sm flex justify-between items-center animate-slide-up">
         <span>
             <?php 
             if ($error) {
@@ -603,7 +598,7 @@ if ($nextMonth > 12) {
             }
             ?>
         </span>
-        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red' : 'green'; ?>-600">
+        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red-600 hover:text-red-800' : 'success hover:text-success-dark'; ?>">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -620,37 +615,52 @@ if ($nextMonth > 12) {
     </script>
     <?php endif; ?>
     
-    <div class="grid grid-cols-1 lg:grid-cols-7 gap-4">
-        <div class="lg:col-span-5 bg-white rounded-lg shadow-md p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-800"><?php echo $monthName . ' ' . $year; ?></h3>
+    <div class="grid grid-cols-1 lg:grid-cols-7 gap-6">
+        <!-- Calendar -->
+        <div class="lg:col-span-5 bg-white rounded-xl shadow-sm border border-primary-100 p-6 animate-slide-up">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-medium text-neutral-dark"><?php echo $monthName . ' ' . $year; ?></h3>
                 <div class="flex space-x-2">
-                    <a href="index.php?page=schedule&month=<?php echo $prevMonth; ?>&year=<?php echo $prevYear; ?>" class="p-2 rounded-md hover:bg-gray-100">
+                    <a href="index.php?page=schedule&month=<?php echo $prevMonth; ?>&year=<?php echo $prevYear; ?>" class="p-2 bg-primary-50 text-primary-500 rounded-lg hover:bg-primary-100 transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                         </svg>
                     </a>
-                    <a href="index.php?page=schedule&month=<?php echo $nextMonth; ?>&year=<?php echo $nextYear; ?>" class="p-2 rounded-md hover:bg-gray-100">
+                    <a href="index.php?page=schedule&month=<?php echo $nextMonth; ?>&year=<?php echo $nextYear; ?>" class="p-2 bg-primary-50 text-primary-500 rounded-lg hover:bg-primary-100 transition-all duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </a>
                 </div>
             </div>
-            <div class="grid grid-cols-7 gap-2 text-center mb-2">
-                <div class="text-sm font-medium text-gray-500">Sun</div>
-                <div class="text-sm font-medium text-gray-500">Mon</div>
-                <div class="text-sm font-medium text-gray-500">Tue</div>
-                <div class="text-sm font-medium text-gray-500">Wed</div>
-                <div class="text-sm font-medium text-gray-500">Thu</div>
-                <div class="text-sm font-medium text-gray-500">Fri</div>
-                <div class="text-sm font-medium text-gray-500">Sat</div>
+            <div class="grid grid-cols-7 gap-2 text-center mb-4">
+                <div class="text-xs font-medium text-primary-500 uppercase">Sun</div>
+                <div class="text-xs font-medium text-primary-500 uppercase">Mon</div>
+                <div class="text-xs font-medium text-primary-500 uppercase">Tue</div>
+                <div class="text-xs font-medium text-primary-500 uppercase">Wed</div>
+                <div class="text-xs font-medium text-primary-500 uppercase">Thu</div>
+                <div class="text-xs font-medium text-primary-500 uppercase">Fri</div>
+                <div class="text-xs font-medium text-primary-500 uppercase">Sat</div>
             </div>
             <div class="grid grid-cols-7 gap-2">
                 <?php
+                // Previous and next month links
+                $prevMonth = $month - 1;
+                $prevYear = $year;
+                if ($prevMonth < 1) {
+                    $prevMonth = 12;
+                    $prevYear--;
+                }
+
+                $nextMonth = $month + 1;
+                $nextYear = $year;
+                if ($nextMonth > 12) {
+                    $nextMonth = 1;
+                    $nextYear++;
+                }
                 // Add blank cells for days before the first day of the month
                 for ($i = 0; $i < $dayOfWeek; $i++) {
-                    echo '<div class="relative h-16 p-1 border rounded-md text-gray-400"></div>';
+                    echo '<div class="relative h-16 p-1 border border-primary-100 rounded-md text-secondary bg-neutral-light"></div>';
                 }
                 
                 // Add cells for each day of the month
@@ -669,26 +679,26 @@ if ($nextMonth > 12) {
                     
                     // Check if there are appointments for this day
                     $appointmentCount = isset($appointmentCounts[$date]) ? $appointmentCounts[$date] : 0;
-                    $appointmentClass = $appointmentCount > 0 ? 'bg-teal-50' : '';
+                    $appointmentClass = $appointmentCount > 0 ? 'bg-primary-50' : '';
                     
                     // Apply todayClass ONLY if it is the current date
-                    $todayClass = $isToday ? 'bg-teal-100 font-bold border-2 border-teal-500' : '';
+                    $todayClass = $isToday ? 'bg-primary-100 font-bold border-2 border-primary-500' : '';
                     
                     // Apply selectedClass if it is the selected date, but NOT today
-                    $selectedClass = ($isSelected && !$isToday) ? 'border-teal-500 border-2' : '';
+                    $selectedClass = ($isSelected && !$isToday) ? 'border-2 border-primary-500' : '';
                     
-                    $pastClass = $isPast ? 'bg-gray-100 text-gray-500' : '';
+                    $pastClass = $isPast ? 'bg-neutral-light text-secondary' : '';
                     
-                    echo '<div class="relative h-16 p-1 border rounded-md ' . $appointmentClass . ' ' . $todayClass . ' ' . $selectedClass . ' ' . $pastClass . '">
+                    echo '<div class="relative h-16 p-1 border border-primary-100 rounded-md ' . $appointmentClass . ' ' . $todayClass . ' ' . $selectedClass . ' ' . $pastClass . ' hover:bg-primary-50 transition-all duration-200">
                         <a href="index.php?page=schedule&date=' . $date . '" class="block h-full w-full">
-                            <div class="text-sm">' . $day . '</div>';
+                            <div class="text-sm text-neutral-dark">' . $day . '</div>';
                     
                     if ($appointmentCount > 0) {
-                        echo '<div class="text-xs text-teal-600 font-medium">' . $appointmentCount . ' appt</div>';
+                        echo '<div class="text-xs text-primary-500 font-medium">' . $appointmentCount . ' appt</div>';
                     }
                     
                     if ($appointmentCount > 0) {
-                        echo '<div class="absolute bottom-1 left-0 right-0 flex justify-center"><div class="h-1 w-1 rounded-full bg-teal-500"></div></div>';
+                        echo '<div class="absolute bottom-1 left-0 right-0 flex justify-center"><div class="h-1 w-1 rounded-full bg-primary-500"></div></div>';
                     }
                     
                     echo '</a></div>';
@@ -700,13 +710,14 @@ if ($nextMonth > 12) {
                 if ($remainingCells > 7) $remainingCells -= 7; // Don't show an extra row if not needed
                 
                 for ($i = 0; $i < $remainingCells; $i++) {
-                    echo '<div class="relative h-16 p-1 border rounded-md text-gray-400"></div>';
+                    echo '<div class="relative h-16 p-1 border border-primary-100 rounded-md text-secondary bg-neutral-light"></div>';
                 }
                 ?>
             </div>
         </div>
-        <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <!-- Appointments List -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-primary-100 p-6 animate-slide-up">
+            <h3 class="text-lg font-medium text-neutral-dark mb-6">
                 <?php echo date('F j, Y', strtotime($selectedDate)); ?> Appointments
             </h3>
             <div class="space-y-4">
@@ -718,15 +729,15 @@ if ($nextMonth > 12) {
                         
                         switch ($appointment['status']) {
                             case 'Scheduled':
-                                $statusClass = 'bg-teal-50 border-teal-100';
-                                $statusTextClass = 'text-teal-600';
+                                $statusClass = 'bg-primary-50 border-primary-100';
+                                $statusTextClass = 'text-primary-500';
                                 break;
                             case 'Completed':
-                                $statusClass = 'bg-green-50 border-green-100';
-                                $statusTextClass = 'text-green-600';
+                                $statusClass = 'bg-success-light border-success';
+                                $statusTextClass = 'text-success';
                                 break;
                             case 'Cancelled':
-                                $statusClass = 'bg-red-50 border-red-100';
+                                $statusClass = 'bg-red-100 border-red-200';
                                 $statusTextClass = 'text-red-600';
                                 break;
                             case 'Re-scheduled':
@@ -734,34 +745,34 @@ if ($nextMonth > 12) {
                                 $statusTextClass = 'text-yellow-600';
                                 break;
                             default:
-                                $statusClass = 'bg-gray-50 border-gray-100';
-                                $statusTextClass = 'text-gray-600';
+                                $statusClass = 'bg-primary-50 border-primary-100';
+                                $statusTextClass = 'text-primary-500';
                         }
                         ?>
-                        <div class="p-3 <?php echo $statusClass; ?> rounded-md border">
+                        <div class="p-4 <?php echo $statusClass; ?> rounded-lg border shadow-sm hover:bg-opacity-75 transition-all duration-200">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <p class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($appointment['patient_name']); ?></p>
-                                    <p class="text-xs text-gray-500"><?php echo htmlspecialchars($appointment['service_name']); ?></p>
-                                    <p class="text-xs text-gray-500">Dr. <?php echo htmlspecialchars($appointment['doctor_name']); ?></p>
+                                    <p class="text-sm font-medium text-neutral-dark"><?php echo htmlspecialchars($appointment['patient_name']); ?></p>
+                                    <p class="text-xs text-secondary"><?php echo htmlspecialchars($appointment['service_name']); ?></p>
+                                    <p class="text-xs text-secondary">Dr. <?php echo htmlspecialchars($appointment['doctor_name']); ?></p>
                                 </div>
                                 <div class="text-right">
                                     <p class="text-sm font-medium <?php echo $statusTextClass; ?>"><?php echo date('h:00 A', strtotime($appointment['appointment_time'])); ?></p>
-                                    <p class="text-xs text-gray-500"><?php echo htmlspecialchars($appointment['service_duration']); ?></p>
+                                    <p class="text-xs text-secondary"><?php echo htmlspecialchars($appointment['service_duration']); ?></p>
                                     <p class="text-xs <?php echo $statusTextClass; ?>"><?php echo htmlspecialchars($appointment['status']); ?></p>
                                 </div>
                             </div>
                             <?php if ($appointment['status'] == 'Scheduled'): ?>
-                                <div class="mt-2 flex justify-end space-x-2">
-                                    <button type="button" class="text-xs bg-green-500 text-white px-2 py-1 rounded" 
+                                <div class="mt-3 flex justify-end space-x-2">
+                                    <button type="button" class="text-xs bg-success text-white px-2 py-1 rounded-lg hover:bg-success-dark transition-all duration-200" 
                                             onclick="updateStatus(<?php echo $appointment['id']; ?>, 'Completed')">
                                         Complete
                                     </button>
-                                    <button type="button" class="text-xs bg-yellow-500 text-white px-2 py-1 rounded" 
+                                    <button type="button" class="text-xs bg-yellow-500 text-white px-2 py-1 rounded-lg hover:bg-yellow-600 transition-all duration-200" 
                                             onclick="updateStatus(<?php echo $appointment['id']; ?>, 'Re-scheduled')">
                                         Reschedule
                                     </button>
-                                    <button type="button" class="text-xs bg-red-500 text-white px-2 py-1 rounded" 
+                                    <button type="button" class="text-xs bg-red-600 text-white px-2 py-1 rounded-lg hover:bg-red-700 transition-all duration-200" 
                                             onclick="updateStatus(<?php echo $appointment['id']; ?>, 'Cancelled')">
                                         Cancel
                                     </button>
@@ -770,13 +781,16 @@ if ($nextMonth > 12) {
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="p-3 bg-gray-50 rounded-md border border-gray-100 text-center">
-                        <p class="text-sm text-gray-500">No appointments scheduled for this date.</p>
+                    <div class="p-4 bg-primary-50 rounded-lg border border-primary-100 text-center shadow-sm">
+                        <p class="text-sm text-secondary">No appointments scheduled for this date.</p>
                     </div>
                 <?php endif; ?>
             </div>
             <div class="mt-6">
-                <button class="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 px-4 rounded-md" onclick="openAppointmentModal()">
+                <button class="w-full bg-gradient-to-r from-primary-500 to-accent-300 text-white py-2 px-4 rounded-lg hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2" onclick="openAppointmentModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
                     Add New Appointment
                 </button>
             </div>
@@ -784,16 +798,16 @@ if ($nextMonth > 12) {
     </div>
     
     <!-- Appointment Modal -->
-    <div id="appointmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div id="appointmentModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-6 border w-full max-w-md md:w-[90%] shadow-lg rounded-xl bg-white border-primary-100">
             <div class="mt-3">
-                <h3 class="text-lg font-medium text-gray-900">Schedule New Appointment</h3>
-                <form id="appointmentForm" method="POST" class="mt-4">
+                <h3 class="text-lg font-medium text-neutral-dark">Schedule New Appointment</h3>
+                <form id="appointmentForm" method="POST" class="mt-4 space-y-4">
                     <input type="hidden" name="action" value="add_appointment">
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Patient</label>
-                        <select name="patient_id" id="patientSelect" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Patient</label>
+                        <select name="patient_id" id="patientSelect" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                             <option value="">Select Patient</option>
                             <?php foreach ($patients as $patient): ?>
                                 <option value="<?php echo $patient['id']; ?>">
@@ -803,9 +817,9 @@ if ($nextMonth > 12) {
                         </select>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Service</label>
-                        <select name="service_id" id="serviceSelect" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Service</label>
+                        <select name="service_id" id="serviceSelect" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                             <option value="">Select Service</option>
                             <?php foreach ($services as $service): ?>
                                 <option value="<?php echo $service['id']; ?>" data-doctor="<?php echo htmlspecialchars($service['kind_of_doctor']); ?>">
@@ -815,9 +829,9 @@ if ($nextMonth > 12) {
                         </select>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Doctor</label>
-                        <select name="staff_id" id="doctorSelect" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Doctor</label>
+                        <select name="staff_id" id="doctorSelect" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                             <option value="">Select Doctor</option>
                             <?php foreach ($doctors as $doctor): ?>
                                 <option value="<?php echo $doctor['id']; ?>" data-position="<?php echo htmlspecialchars($doctor['doctor_position']); ?>">
@@ -827,29 +841,29 @@ if ($nextMonth > 12) {
                         </select>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Date</label>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Date</label>
                         <input type="date" name="appointment_date" id="appointmentDate" required 
                                min="<?php echo $currentDate; ?>" 
                                value="<?php echo $selectedDate; ?>" 
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                               class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Time</label>
-                        <select name="appointment_time" id="timeSelect" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Time</label>
+                        <select name="appointment_time" id="timeSelect" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                             <option value="">Select Time</option>
                         </select>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Remarks</label>
-                        <textarea name="remarks" id="remarks" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500"></textarea>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Remarks</label>
+                        <textarea name="remarks" id="remarks" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3"></textarea>
                     </div>
                     
-                    <div class="flex justify-end space-x-2">
-                        <button type="button" onclick="closeAppointmentModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700">Schedule</button>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeAppointmentModal()" class="px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-all duration-200">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Schedule</button>
                     </div>
                 </form>
             </div>
@@ -857,32 +871,32 @@ if ($nextMonth > 12) {
     </div>
     
     <!-- Payment Modal -->
-    <div id="paymentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div id="paymentModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-6 border w-full max-w-md md:w-[90%] shadow-lg rounded-xl bg-white border-primary-100">
             <div class="mt-3">
-                <h3 class="text-lg font-medium text-gray-900">Record Payment</h3>
-                <form id="paymentForm" method="POST" class="mt-4">
+                <h3 class="text-lg font-medium text-neutral-dark">Record Payment</h3>
+                <form id="paymentForm" method="POST" class="mt-4 space-y-4">
                     <input type="hidden" name="action" value="record_payment">
                     <input type="hidden" name="appointment_id" id="paymentAppointmentId">
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Patient</label>
-                        <p id="paymentPatientName" class="mt-1 text-gray-900"></p>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Patient</label>
+                        <p id="paymentPatientName" class="mt-1 text-neutral-dark text-sm"></p>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Service</label>
-                        <p id="paymentServiceName" class="mt-1 text-gray-900"></p>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Service</label>
+                        <p id="paymentServiceName" class="mt-1 text-neutral-dark text-sm"></p>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Amount</label>
-                        <input type="number" name="amount" id="paymentAmount" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Amount</label>
+                        <input type="number" name="amount" id="paymentAmount" step="0.01" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Payment Method</label>
-                        <select name="payment_method" id="paymentMethod" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500">
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-dark">Payment Method</label>
+                        <select name="payment_method" id="paymentMethod" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
                             <option value="">Select Method</option>
                             <option value="Cash">Cash</option>
                             <option value="GCash">GCash</option>
@@ -891,13 +905,13 @@ if ($nextMonth > 12) {
 
                     <!-- QR Code Container (initially hidden) -->
                     <div id="qrCodeContainer" class="mb-4 text-center hidden">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Scan to Pay (GCash)</label>
-                        <img src="Uploads/Qrcode/GCash-MyQr.jpg" alt="GCash QR Code" class="mx-auto rounded-md shadow-sm max-w-xs">
+                        <label class="block text-sm font-medium text-neutral-dark mb-2">Scan to Pay (GCash)</label>
+                        <img src="Uploads/Qrcode/GCash-MyQr.jpg" alt="GCash QR Code" class="mx-auto rounded-lg shadow-sm max-w-xs">
                     </div>
                     
-                    <div class="flex justify-end space-x-2">
-                        <button type="button" onclick="closePaymentModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Record Payment</button>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closePaymentModal()" class="px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-all duration-200">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-success to-success-dark text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Record Payment</button>
                     </div>
                 </form>
             </div>
@@ -1231,3 +1245,77 @@ $(document).ready(function() {
     });
 });
 </script>
+
+<style>
+    /* Tailwind custom fonts */
+    .font-heading {
+        font-family: 'Poppins', sans-serif;
+    }
+    .font-body {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Custom animations */
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease-in;
+    }
+    .animate-slide-up {
+        animation: slideUp 0.5s ease-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f8fafc;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #ccfbf1;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #99f6e4;
+    }
+
+    /* Smooth transitions */
+    .transition-all {
+        transition: all 0.3s ease;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 640px) {
+        #schedule {
+            padding: 4px;
+        }
+        .grid-cols-7 {
+            gap: 0.5rem;
+        }
+        .h-16 {
+            height: 4rem;
+        }
+        .text-sm {
+            font-size: 0.75rem;
+        }
+        .text-xs {
+            font-size: 0.625rem;
+        }
+        .fixed.inset-0 > div {
+            width: 90% !important;
+            max-width: none !important;
+            margin: 0 auto;
+        }
+    }
+</style>
+</body>
+</html>

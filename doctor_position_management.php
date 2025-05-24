@@ -1,4 +1,3 @@
-
 <?php
 //doctoc_position
 // Start output buffering to prevent "headers already sent" errors
@@ -286,29 +285,29 @@ try {
 }
 ?>
 
-<div id="management" class="space-y-6">
-    <h2 class="text-xl font-medium text-gray-800">Services Management</h2>
+<div id="management" class="space-y-6 bg-neutral-light p-6 md:p-8 animate-fade-in">
+    <h2 class="text-2xl md:text-3xl font-heading font-bold text-primary-500">Services Management</h2>
     <!-- Tabs for Information Sections -->
-    <div class="border-b border-gray-200">
-        <ul class="flex flex-wrap -mb-px text-sm">
+    <div class="border-b border-primary-100">
+        <ul class="flex flex-wrap -mb-px text-sm overflow-x-auto">
             <li class="mr-2">
-                <a href="index.php?page=information" class="inline-block p-3 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300">Overview</a>
+                <a href="index.php?page=information" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Overview</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=home_management" class="inline-block p-3 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300">Data</a>
+                <a href="index.php?page=home_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Data</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=doctor_position_management" class="inline-block p-3 border-b-2 border-primary-600 text-primary-600">Services</a>
+                <a href="index.php?page=doctor_position_management" class="inline-block p-3 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-t-lg hover:brightness-110 hover:scale-105 transition-all duration-200">Services</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=staff_management" class="inline-block p-3 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300">Staff</a>
+                <a href="index.php?page=staff_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Staff</a>
             </li>
         </ul>
     </div>
 
     <!-- Success/Error Message -->
     <?php if (isset($_GET['success']) || $error): ?>
-    <div id="alert" class="bg-<?php echo $error ? 'red' : 'green'; ?>-50 border border-<?php echo $error ? 'red' : 'green'; ?>-200 text-<?php echo $error ? 'red' : 'green'; ?>-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
+    <div id="alert" class="bg-<?php echo $error ? 'red' : 'success'; ?>-50 border border-<?php echo $error ? 'red' : 'success'; ?>-200 text-<?php echo $error ? 'red' : 'success'; ?>-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
         <span>
             <?php 
             if ($error) {
@@ -324,7 +323,7 @@ try {
             }
             ?>
         </span>
-        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red' : 'green'; ?>-600">
+        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red' : 'success'; ?>-600">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -343,11 +342,11 @@ try {
 
     <!-- Doctor Management Section -->
     <div id="doctor_position_management" class="space-y-6">
-        <h2 class="text-xl font-medium text-gray-800">Doctor Position Management</h2>
-        <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-medium text-neutral-dark">Doctor Position Management</h2>
+        <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-md transition-all duration-200 p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Doctor Positions</h3>
-                <button type="button" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md text-sm flex items-center" onclick="openAddDoctorModal()">
+                <h3 class="text-lg font-medium text-neutral-dark">Doctor Positions</h3>
+                <button type="button" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-3 py-1.5 rounded-lg text-sm flex items-center hover:scale-105 transition-all duration-200" onclick="openAddDoctorModal()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
@@ -357,35 +356,35 @@ try {
 
             <!-- Doctor Table -->
             <div class="overflow-x-auto">
-                <table id="doctorTable" class="min-w-full divide-y divide-gray-200 border-separate border-spacing-0 mobile-card-view">
-                    <thead class="bg-gray-50">
+                <table id="doctorTable" class="min-w-full divide-y divide-primary-100 border-separate border-spacing-0 mobile-card-view">
+                    <thead class="bg-neutral-light">
                         <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Position</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Description</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Created Date</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Actions</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Position</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Description</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Created Date</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-primary-100">
                         <?php foreach ($positions as $position): ?>
-                        <tr id="position-row-<?php echo $position['id']; ?>" class="hover:bg-gray-50">
+                        <tr id="position-row-<?php echo $position['id']; ?>" class="hover:bg-primary-50 transition-colors duration-200">
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900"><?php echo htmlspecialchars($position['doctor_position']); ?></div>
+                                <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($position['doctor_position']); ?></div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900 truncate max-w-xs"><?php echo htmlspecialchars(substr($position['description'], 0, 50)) . (strlen($position['description']) > 50 ? '...' : ''); ?></div>
+                                <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($position['description'], 0, 50)) . (strlen($position['description']) > 50 ? '...' : ''); ?></div>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap">
-                                <div class="text-sm text-gray-900"><?php echo date('M d, Y H:i', strtotime($position['created_at'])); ?></div>
+                                <div class="text-sm text-neutral-dark"><?php echo date('M d, Y H:i', strtotime($position['created_at'])); ?></div>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm">
                                 <div class="flex space-x-1">
-                                    <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditDoctorModal(<?php echo $position['id']; ?>, '<?php echo addslashes($position['doctor_position']); ?>', '<?php echo addslashes($position['description']); ?>')">
+                                    <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditDoctorModal(<?php echo $position['id']; ?>, '<?php echo addslashes($position['doctor_position']); ?>', '<?php echo addslashes($position['description']); ?>')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </button>
-                                    <button type="button" class="text-red-600 hover:text-red-800" onclick="deletePosition(<?php echo $position['id']; ?>)">
+                                    <button type="button" class="text-accent-500 hover:text-accent-600 transition-colors duration-200" onclick="deletePosition(<?php echo $position['id']; ?>)">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
@@ -400,27 +399,27 @@ try {
         </div>
 
         <!-- Doctor Modal -->
-        <div id="doctorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div id="doctorModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
                 <div class="mt-3">
-                    <h3 class="text-lg font-medium text-gray-900" id="doctorModalTitle">Add Doctor Position</h3>
+                    <h3 class="text-lg font-medium text-neutral-dark" id="doctorModalTitle">Add Doctor Position</h3>
                     <form id="doctorForm" method="POST" class="mt-4" onsubmit="return validateDoctorForm()">
                         <input type="hidden" name="action" value="add_doctor">
                         <input type="hidden" name="id" id="doctorId">
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Doctor Position</label>
-                            <input type="text" name="doctor_position" id="doctorPosition" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <label class="block text-sm font-medium text-neutral-dark">Doctor Position</label>
+                            <input type="text" name="doctor_position" id="doctorPosition" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Description</label>
-                            <textarea name="description" id="doctorDescription" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                            <label class="block text-sm font-medium text-neutral-dark">Description</label>
+                            <textarea name="description" id="doctorDescription" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
                         </div>
                         
                         <div class="flex justify-end space-x-2">
-                            <button type="button" onclick="closeDoctorModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save</button>
+                            <button type="button" onclick="closeDoctorModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">Save</button>
                         </div>
                     </form>
                 </div>
@@ -430,11 +429,11 @@ try {
 
     <!-- Service Management Section -->
     <div id="service_management" class="space-y-6">
-        <h2 class="text-xl font-medium text-gray-800">Service Management</h2>
-        <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-medium text-neutral-dark">Service Management</h2>
+        <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-md transition-all duration-200 p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Services</h3>
-                <button type="button" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md text-sm flex items-center" onclick="openAddServiceModal()">
+                <h3 class="text-lg font-medium text-neutral-dark">Services</h3>
+                <button type="button" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-3 py-1.5 rounded-lg text-sm flex items-center hover:scale-105 transition-all duration-200" onclick="openAddServiceModal()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
@@ -444,43 +443,43 @@ try {
 
             <!-- Service Table -->
             <div class="overflow-x-auto">
-                <table id="serviceTable" class="min-w-full divide-y divide-gray-200 border-separate border-spacing-0 mobile-card-view">
-                    <thead class="bg-gray-50">
+                <table id="serviceTable" class="min-w-full divide-y divide-primary-100 border-separate border-spacing-0 mobile-card-view">
+                    <thead class="bg-neutral-light">
                         <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Picture</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Service Name</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Description</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Duration</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Price</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Kind of Doctor</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">Actions</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Picture</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Service Name</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Description</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Duration</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Price</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Kind of Doctor</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-primary-100">
                         <?php foreach ($services as $service): ?>
-                        <tr id="service-row-<?php echo $service['id']; ?>" class="hover:bg-gray-50">
+                        <tr id="service-row-<?php echo $service['id']; ?>" class="hover:bg-primary-50 transition-colors duration-200">
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900">
+                                <div class="text-sm text-neutral-dark">
                                     <?php if ($service['service_picture']): ?>
-                                        <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="Service Image" class="h-10 w-10 object-cover">
+                                        <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="Service Image" class="h-10 w-10 object-cover rounded-lg">
                                     <?php else: ?>
                                         No Image
                                     <?php endif; ?>
                                 </div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['service_name']); ?></div>
+                                <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($service['service_name']); ?></div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900 truncate max-w-xs"><?php echo htmlspecialchars(substr($service['service_description'], 0, 50)) . (strlen($service['service_description']) > 50 ? '...' : ''); ?></div>
+                                <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($service['service_description'], 0, 50)) . (strlen($service['service_description']) > 50 ? '...' : ''); ?></div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['time']); ?></div>
+                                <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($service['time']); ?></div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900 flex items-center space-x-2">
+                                <div class="text-sm text-neutral-dark flex items-center space-x-2">
                                     <span id="price-<?php echo $service['id']; ?>">₱<?php echo number_format($service['price'], 2); ?></span>
-                                    <button type="button" class="text-green-600 hover:text-green-800" onclick="openPriceModal(<?php echo $service['id']; ?>, <?php echo $service['price']; ?>)">
+                                    <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openPriceModal(<?php echo $service['id']; ?>, <?php echo $service['price']; ?>)">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                         </svg>
@@ -488,16 +487,16 @@ try {
                                 </div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="text-sm text-gray-900"><?php echo htmlspecialchars($service['kind_of_doctor']); ?></div>
+                                <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($service['kind_of_doctor']); ?></div>
                             </td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm">
                                 <div class="flex space-x-1">
-                                    <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditServiceModal(<?php echo $service['id']; ?>, '<?php echo addslashes($service['service_name']); ?>', '<?php echo addslashes($service['service_description']); ?>', '<?php echo addslashes($service['service_picture']); ?>', <?php echo $service['price']; ?>, '<?php echo addslashes($service['time']); ?>', '<?php echo addslashes($service['kind_of_doctor']); ?>')">
+                                    <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditServiceModal(<?php echo $service['id']; ?>, '<?php echo addslashes($service['service_name']); ?>', '<?php echo addslashes($service['service_description']); ?>', '<?php echo addslashes($service['service_picture']); ?>', <?php echo $service['price']; ?>, '<?php echo addslashes($service['time']); ?>', '<?php echo addslashes($service['kind_of_doctor']); ?>')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </button>
-                                    <button type="button" class="text-red-600 hover:text-red-800" onclick="deleteService(<?php echo $service['id']; ?>)">
+                                    <button type="button" class="text-accent-500 hover:text-accent-600 transition-colors duration-200" onclick="deleteService(<?php echo $service['id']; ?>)">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
@@ -512,41 +511,41 @@ try {
         </div>
 
         <!-- Service Modal -->
-        <div id="serviceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div id="serviceModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
                 <div class="mt-3">
-                    <h3 class="text-lg font-medium text-gray-900" id="serviceModalTitle">Add Service</h3>
+                    <h3 class="text-lg font-medium text-neutral-dark" id="serviceModalTitle">Add Service</h3>
                     <form id="serviceForm" method="POST" enctype="multipart/form-data" class="mt-4">
                         <input type="hidden" name="action" value="add_service">
                         <input type="hidden" name="id" id="serviceId">
                         <input type="hidden" name="existing_picture" id="existingPicture">
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Service Name</label>
-                            <input type="text" name="service_name" id="serviceName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <label class="block text-sm font-medium text-neutral-dark">Service Name</label>
+                            <input type="text" name="service_name" id="serviceName" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                         </div>
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Description</label>
-                            <textarea name="service_description" id="serviceDescription" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                            <label class="block text-sm font-medium text-neutral-dark">Description</label>
+                            <textarea name="service_description" id="serviceDescription" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
                         </div>
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Picture</label>
-                            <input type="file" name="service_picture" id="servicePicture" accept="image/*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <label class="block text-sm font-medium text-neutral-dark">Picture</label>
+                            <input type="file" name="service_picture" id="servicePicture" accept="image/*" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                             <div id="currentImage" class="mt-2 hidden">
-                                <img src="" alt="Current Image" class="h-20 w-20 object-cover">
+                                <img src="" alt="Current Image" class="h-20 w-20 object-cover rounded-lg">
                             </div>
                         </div>
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Price (₱)</label>
-                            <input type="number" step="10.0" name="price" id="servicePrice" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <label class="block text-sm font-medium text-neutral-dark">Price (₱)</label>
+                            <input type="number" step="10.0" name="price" id="servicePrice" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                         </div>
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Duration</label>
-                            <select name="time" id="serviceTime" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <label class="block text-sm font-medium text-neutral-dark">Duration</label>
+                            <select name="time" id="serviceTime" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                                 <option value="">Select Duration</option>
                                 <option value="30 minutes">30 minutes</option>
                                 <option value="1 hour">1 hour</option>
@@ -556,8 +555,8 @@ try {
                         </div>
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Kind of Doctor</label>
-                            <select name="kind_of_doctor" id="serviceKindOfDoctor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                            <label class="block text-sm font-medium text-neutral-dark">Kind of Doctor</label>
+                            <select name="kind_of_doctor" id="serviceKindOfDoctor" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
                                 <option value="">Select Doctor Position</option>
                                 <?php 
                                 // Get all active doctor positions
@@ -574,8 +573,8 @@ try {
                         </div>
 
                         <div class="flex justify-end space-x-2">
-                            <button type="button" onclick="closeServiceModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save</button>
+                            <button type="button" onclick="closeServiceModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">Save</button>
                         </div>
                     </form>
                 </div>
@@ -583,22 +582,22 @@ try {
         </div>
 
         <!-- Price Update Modal -->
-        <div id="priceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div id="priceModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
                 <div class="mt-3">
-                    <h3 class="text-lg font-medium text-gray-900">Update Price</h3>
+                    <h3 class="text-lg font-medium text-neutral-dark">Update Price</h3>
                     <form id="priceForm" method="POST" class="mt-4">
                         <input type="hidden" name="action" value="update_price">
                         <input type="hidden" name="id" id="priceServiceId">
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">New Price (₱)</label>
-                            <input type="number" step="10" name="price" id="newPrice" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <label class="block text-sm font-medium text-neutral-dark">New Price (₱)</label>
+                            <input type="number" step="10" name="price" id="newPrice" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                         </div>
 
                         <div class="flex justify-end space-x-2">
-                            <button type="button" onclick="closePriceModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Update</button>
+                            <button type="button" onclick="closePriceModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">Update</button>
                         </div>
                     </form>
                 </div>
@@ -606,6 +605,108 @@ try {
         </div>
     </div>
 </div>
+
+<style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f8fafc;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #ccfbf1;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #99f6e4;
+    }
+
+    /* Smooth transitions */
+    .transition-all {
+        transition: all 0.3s ease;
+    }
+
+    /* DataTable styles */
+    .dataTables_wrapper {
+        width: 100%;
+    }
+    #doctorTable, #serviceTable {
+        width: 100% !important;
+    }
+    #doctorTable th, #doctorTable td,
+    #serviceTable th, #serviceTable td {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 12px;
+    }
+    #doctorTable tbody tr,
+    #serviceTable tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    .dataTables_scrollBody {
+        overflow-x: hidden !important;
+    }
+
+    /* Mobile card view */
+    @media (max-width: 640px) {
+        #management {
+            padding: 4px;
+        }
+        
+        /* Mobile card view for tables */
+        #doctorTable.mobile-card-view thead,
+        #serviceTable.mobile-card-view thead {
+            display: none;
+        }
+        
+        #doctorTable.mobile-card-view tbody tr,
+        #serviceTable.mobile-card-view tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid #ccfbf1;
+            border-radius: 0.5rem;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        #doctorTable.mobile-card-view tbody td,
+        #serviceTable.mobile-card-view tbody td {
+            display: flex;
+            padding: 0.75rem;
+            border: none;
+            align-items: center;
+        }
+        
+        #doctorTable.mobile-card-view tbody td:before,
+        #serviceTable.mobile-card-view tbody td:before {
+            content: attr(data-label);
+            font-weight: 500;
+            width: 40%;
+            margin-right: 1rem;
+            color: #475569;
+        }
+        
+        #doctorTable.mobile-card-view tbody td .cell-content,
+        #serviceTable.mobile-card-view tbody td .cell-content {
+            flex: 1;
+        }
+        
+        /* Adjust first and last cells */
+        #doctorTable.mobile-card-view tbody td:first-child,
+        #serviceTable.mobile-card-view tbody td:first-child {
+            padding-top: 1rem;
+        }
+        
+        #doctorTable.mobile-card-view tbody td:last-child,
+        #serviceTable.mobile-card-view tbody td:last-child {
+            padding-bottom: 1rem;
+        }
+    }
+</style>
 
 <script>
 function openAddDoctorModal() {

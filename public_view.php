@@ -13,131 +13,121 @@ $home = $stmt->fetch();
 $stmt = $pdo->query("SELECT * FROM clinic_details ORDER BY created_at DESC LIMIT 1");
 $clinic = $stmt->fetch();
 
-// Get active services
-$stmt = $pdo->query("SELECT * FROM services WHERE status = 1 ORDER BY created_at DESC");
+// Get 10 oldest active services
+$stmt = $pdo->query("SELECT * FROM services WHERE status = 1 ORDER BY created_at ASC LIMIT 10");
 $services = $stmt->fetchAll();
 
-// Get active doctors
+// Get 5 oldest active doctors
 $stmt = $pdo->query("SELECT s.*, dp.doctor_position as position_name 
                      FROM staff s 
                      LEFT JOIN doctor_position dp ON s.doctor_position_id = dp.id 
                      WHERE s.status = 1 AND s.role = 'doctor' 
-                     ORDER BY s.createdDate DESC");
+                     ORDER BY s.createdDate ASC LIMIT 5");
 $doctors = $stmt->fetchAll();
 
+// Get all active doctors for modal
+$stmt = $pdo->query("SELECT s.*, dp.doctor_position as position_name 
+                     FROM staff s 
+                     LEFT JOIN doctor_position dp ON s.doctor_position_id = dp.id 
+                     WHERE s.status = 1 AND s.role = 'doctor'");
+$all_doctors = $stmt->fetchAll();
+
+// Get all active services for modal
+$stmt = $pdo->query("SELECT * FROM services WHERE status = 1");
+$all_services = $stmt->fetchAll();
+
 // Handle AJAX requests
-if (isset($_GET['action'])) {
-    // Get available time slots for a specific date
-    if ($_GET['action'] == 'get_time_slots' && isset($_GET['date']) && isset($_GET['service_id']) && isset($_GET['doctor_id'])) {
-        try {
-            $date = $_GET['date'];
-            $service_id = $_GET['service_id'];
-            $doctor_id = $_GET['doctor_id'];
-            
-            // Check if date is in the past
-            if (strtotime($date) < strtotime(date('Y-m-d'))) {
-                ob_clean();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Cannot book appointments for past dates']);
-                exit();
-            }
-            
-            // Get day of week for the selected date
-            $dayOfWeek = date('l', strtotime($date));
-            
-            // Check if it's doctor's rest day
-            $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day = :rest_day");
-            $stmt->execute([':doctor_id' => $doctor_id, ':rest_day' => $dayOfWeek]);
-            $restDay = $stmt->fetch();
-            
-            if ($restDay) {
-                ob_clean();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Doctor is not available on ' . $dayOfWeek]);
-                exit();
-            }
-            
-            // Get clinic hours for the day
-            $clinicHours = '';
-            if ($dayOfWeek == 'Sunday') {
-                $clinicHours = $clinic['hours_sunday'];
-            } else if ($dayOfWeek == 'Saturday') {
-                $clinicHours = $clinic['hours_saturday'];
-            } else {
-                $clinicHours = $clinic['hours_weekdays'];
-            }
-            
-            // Check if clinic is closed
-            if ($clinicHours == 'Closed') {
-                ob_clean();
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Clinic is closed on ' . $dayOfWeek]);
-                exit();
-            }
-            
-            // Parse clinic hours
-            $hours = explode(' - ', $clinicHours);
-            $startTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[0]))));
-            $endTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[1]))));
-            
-            // Get doctor's schedule
-            $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day != :rest_day");
-            $stmt->execute([':doctor_id' => $doctor_id, ':rest_day' => $dayOfWeek]);
-            $doctorSchedule = $stmt->fetch();
-            
-            if ($doctorSchedule) {
-                // Use doctor's specific hours if available
-                $startTime = $doctorSchedule['start_time'];
-                $endTime = $doctorSchedule['end_time'];
-            }
-            
-            // Get existing appointments for the selected date and doctor
-            $stmt = $pdo->prepare("SELECT HOUR(appointment_time) as booked_hour 
-                                  FROM appointments 
-                                  WHERE staff_id = :doctor_id AND appointment_date = :date 
-                                  AND status != 'Cancelled'");
-            $stmt->execute([':doctor_id' => $doctor_id, ':date' => $date]);
-            $bookedHours = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
-            
-            // Generate available time slots (hourly)
-            $availableSlots = [];
-            
-            // Round start time to the next hour if not already on the hour
-            $startHour = intval(date('H', strtotime($startTime)));
-            $startMinute = intval(date('i', strtotime($startTime)));
-            if ($startMinute > 0) {
-                $startHour++; // Move to the next hour
-            }
-            
-            $endHour = intval(date('H', strtotime($endTime)));
-            
-            // Generate slots for each hour
-            for ($hour = $startHour; $hour < $endHour; $hour++) {
-                // Skip lunch hour (typically 12 PM)
-                if ($hour != 12) {
-                    if (!in_array($hour, $bookedHours)) {
-                        $timeStr = sprintf('%02d:00:00', $hour);
-                        $formattedSlot = date('h:00 A', strtotime($timeStr));
-                        $availableSlots[] = $formattedSlot;
-                    }
-                }
-            }
-            
+if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET['date']) && isset($_GET['service_id']) && isset($_GET['doctor_id'])) {
+    try {
+        $date = $_GET['date'];
+        $service_id = $_GET['service_id'];
+        $doctor_id = $_GET['doctor_id'];
+        
+        if (strtotime($date) < strtotime(date('Y-m-d'))) {
             ob_clean();
             header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'slots' => $availableSlots]);
-            exit();
-        } catch (PDOException $e) {
-            ob_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-            exit();
-        } catch (Exception $e) {
-            ob_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Cannot book appointments for past dates']);
             exit();
         }
+        
+        $dayOfWeek = date('l', strtotime($date));
+        
+        $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day = :rest_day");
+        $stmt->execute([':doctor_id' => $doctor_id, ':rest_day' => $dayOfWeek]);
+        $restDay = $stmt->fetch();
+        
+        if ($restDay) {
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Doctor is not available on ' . $dayOfWeek]);
+            exit();
+        }
+        
+        $clinicHours = '';
+        if ($dayOfWeek == 'Sunday') {
+            $clinicHours = $clinic['hours_sunday'];
+        } else if ($dayOfWeek == 'Saturday') {
+            $clinicHours = $clinic['hours_saturday'];
+        } else {
+            $clinicHours = $clinic['hours_weekdays'];
+        }
+        
+        if ($clinicHours == 'Closed') {
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Clinic is closed on ' . $dayOfWeek]);
+            exit();
+        }
+        
+        $hours = explode(' - ', $clinicHours);
+        $startTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[0]))));
+        $endTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[1]))));
+        
+        $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day != :rest_day");
+        $stmt->execute([':doctor_id' => $doctor_id, ':rest_day' => $dayOfWeek]);
+        $doctorSchedule = $stmt->fetch();
+        
+        if ($doctorSchedule) {
+            $startTime = $doctorSchedule['start_time'];
+            $endTime = $doctorSchedule['end_time'];
+        }
+        
+        $stmt = $pdo->prepare("SELECT HOUR(appointment_time) as booked_hour 
+                              FROM appointments 
+                              WHERE staff_id = :doctor_id AND appointment_date = :date 
+                              AND status != 'Cancelled'");
+        $stmt->execute([':doctor_id' => $doctor_id, ':date' => $date]);
+        $bookedHours = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+        
+        $availableSlots = [];
+        $startHour = intval(date('H', strtotime($startTime)));
+        $startMinute = intval(date('i', strtotime($startTime)));
+        if ($startMinute > 0) {
+            $startHour++;
+        }
+        $endHour = intval(date('H', strtotime($endTime)));
+        
+        for ($hour = $startHour; $hour < $endHour; $hour++) {
+            if ($hour != 12 && !in_array($hour, $bookedHours)) {
+                $timeStr = sprintf('%02d:00:00', $hour);
+                $availableSlots[] = date('h:00 A', strtotime($timeStr));
+            }
+        }
+        
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'slots' => $availableSlots]);
+        exit();
+    } catch (PDOException $e) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        exit();
+    } catch (Exception $e) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+        exit();
     }
 }
 ?>
@@ -149,738 +139,403 @@ if (isset($_GET['action'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($clinic['clinic_name']); ?></title>
     
-    <!-- Tailwind CSS CDN -->
+    <!-- Google Fonts: Inter and Poppins -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@700&display=swap">
+    
+    <!-- Tailwind CSS CDN with Custom Configuration -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#ccfbf1',
+                            100: '#99f6e4',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e'
+                        },
+                        secondary: '#475569',
+                        neutral: {
+                            light: '#f8fafc',
+                            dark: '#1e293b'
+                        },
+                        accent: {
+                            100: '#fef3c7',
+                            300: '#fbbf24',
+                            400: '#f59e0b',
+                            500: '#d97706'
+                        },
+                        success: {
+                            DEFAULT: '#10b981',
+                            light: '#d1fae5'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Poppins', 'sans-serif'],
+                        heading: ['Poppins', 'sans-serif']
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        spin: {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' }
+                        },
+                        spinSlow: {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' }
+                        },
+                        pulseOnce: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0.8' }
+                        }
+                    },
+                    animation: {
+                        'slide-up': 'slideUp 0.3s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'spin': 'spin 1s linear infinite',
+                        'spin-slow': 'spinSlow 2s linear infinite',
+                        'pulse-once': 'pulseOnce 0.5s ease-in-out'
+                    }
+                }
+            }
+        }
+    </script>
     
     <!-- Font Awesome CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
+    
     <!-- DataTables CSS -->
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
-
-    <style>
-        :root {
-            --primary-color: #0d9488;
-            --primary-dark: #0f766e;
-            --primary-light: #ccfbf1;
-            --secondary-color: #475569;
-            --accent-color: #f59e0b;
-            --accent-light: #fef3c7;
-            --neutral-light: #f8fafc;
-            --neutral-dark: #1e293b;
-            --success-color: #10b981;
-            --success-light: #d1fae5;
-        }
-        
-        /* Animation Keyframes */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideInLeft {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes slideInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Animation Classes */
-        .animate-fadeInUp {
-            animation: fadeInUp 0.6s ease-out forwards;
-        }
-
-        .animate-fadeIn {
-            animation: fadeIn 0.6s ease-out forwards;
-        }
-
-        .animate-slideInLeft {
-            animation: slideInLeft 0.6s ease-out forwards;
-        }
-
-        .animate-slideInRight {
-            animation: slideInRight 0.6s ease-out forwards;
-        }
-
-        .animate-slideInUp {
-            animation: slideInUp 0.6s ease-out forwards;
-        }
-
-        .animate-slideInDown {
-            animation: slideInDown 0.6s ease-out forwards;
-        }
-
-        .animation-delay-200 {
-            animation-delay: 200ms;
-        }
-
-        .animation-delay-400 {
-            animation-delay: 400ms;
-        }
-
-        .animation-delay-600 {
-            animation-delay: 600ms;
-        }
-
-        .hero-section {
-            background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('<?php echo htmlspecialchars($home['homePic']); ?>');
-            background-size: cover;
-            background-position: center;
-            min-height: 100vh;
-            width: 100%;
-            position: relative;
-            margin-top: 0;
-            padding: 120px 0 80px;
-        }
-
-        /* Ensure the hero section is visible */
-        .hero-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1;
-        }
-
-        .hero-section > * {
-            position: relative;
-            z-index: 2;
-        }
-
-        /* Fix header overlap */
-        header {
-            background-color: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(5px);
-        }
-
-        /* Ensure content is visible */
-        .container {
-            position: relative;
-            z-index: 2;
-        }
-
-        .service-card {
-            background: white;
-            border-radius: 1rem;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-        }
-
-        .service-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .service-image {
-            height: 240px;
-            position: relative;
-        }
-
-        .service-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .service-content {
-            padding: 1.5rem;
-        }
-
-        .service-title {
-            font-size: 1.25rem;
-            color: var(--neutral-dark);
-            margin-bottom: 0.5rem;
-        }
-
-        .service-price {
-            color: var(--primary-color);
-            font-weight: 600;
-            font-size: 1.125rem;
-        }
-
-        .gradient-overlay {
-            background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 100%);
-        }
-
-        .line-clamp-2 {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .text-primary-600 {
-            color: var(--primary-color);
-        }
-
-        .hover\:text-primary-700:hover {
-            color: var(--primary-dark);
-        }
-
-        .bg-primary-600 {
-            background-color: var(--primary-color);
-        }
-
-        .hover\:bg-primary-700:hover {
-            background-color: var(--primary-dark);
-        }
-
-        .bg-primary-50 {
-            background-color: var(--primary-light);
-        }
-
-        .hover\:bg-primary-100:hover {
-            background-color: #99f6e4;
-        }
-
-        .service-card img {
-            height: 12rem;
-            object-fit: cover;
-        }
-
-        .service-card-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .service-card-footer {
-            margin-top: auto;
-        }
-
-        .nav-link.active {
-            color: var(--primary-color);
-        }
-        
-        .nav-link.active span {
-            width: 100%;
-        }
-
-        .nav-link {
-            position: relative;
-            padding: 0.5rem 1rem;
-            color: var(--secondary-color);
-            transition: all 0.3s ease;
-        }
-
-        .nav-link:hover {
-            color: var(--primary-color);
-        }
-
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background-color: var(--primary-color);
-            transition: width 0.3s ease;
-        }
-
-        .nav-link:hover::after {
-            width: 100%;
-        }
-
-        /* Add these new animation keyframes */
-        @keyframes pageLoad {
-            0% {
-                opacity: 0;
-                transform: scale(0.98);
-            }
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        @keyframes slideInFromTop {
-            0% {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeInScale {
-            0% {
-                opacity: 0;
-                transform: scale(0.95);
-            }
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        /* Add these new animation classes */
-        .page-load {
-            animation: pageLoad 0.8s ease-out forwards;
-        }
-
-        .slide-in-top {
-            animation: slideInFromTop 0.6s ease-out forwards;
-        }
-
-        .fade-in-scale {
-            animation: fadeInScale 0.6s ease-out forwards;
-        }
-
-        /* Add loading overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: white;
-            z-index: 9999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: opacity 0.5s ease-out;
-        }
-
-        .loading-overlay.fade-out {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid var(--primary-light);
-            border-top: 3px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Add these new styles */
-        .scroll-animation {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.6s ease-out;
-        }
-
-        .scroll-animation.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .page-transition {
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        /* Section Spacing */
-        section {
-            padding: 100px 0;
-        }
-
-        .section-title {
-            margin-bottom: 60px;
-        }
-
-        .section-title h2 {
-            font-size: 2.5rem;
-            color: var(--neutral-dark);
-            margin-bottom: 1rem;
-        }
-
-        .section-title p {
-            color: var(--secondary-color);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        /* Contact Cards */
-        .contact-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-        }
-
-        .contact-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .contact-icon {
-            width: 3rem;
-            height: 3rem;
-            background-color: var(--primary-light);
-            color: var(--primary-color);
-            border-radius: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-        }
-
-        /* About Section */
-        .about-image {
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .about-content {
-            padding: 2rem;
-        }
-
-        /* Footer */
-        footer {
-            background-color: var(--neutral-dark);
-            color: white;
-            padding: 4rem 0 2rem;
-        }
-
-        .footer-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-
-        .footer-section h3 {
-            color: var(--primary-light);
-            margin-bottom: 1.5rem;
-        }
-
-        .footer-section p {
-            color: #94a3b8;
-        }
-
-        /* Responsive Spacing */
-        @media (max-width: 768px) {
-            section {
-                padding: 60px 0;
-            }
-
-            .section-title {
-                margin-bottom: 40px;
-            }
-
-            .section-title h2 {
-                font-size: 2rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
 </head>
-<body class="bg-gray-50 page-transition">
-    <!-- Add loading overlay at the start of body -->
-    <div class="loading-overlay">
-        <div class="loading-spinner"></div>
+<body class="bg-gray-50 font-sans">
+    <!-- Loading Overlay -->
+    <div class="fixed inset-0 bg-white z-[9999] flex items-center justify-center transition-opacity duration-400 loading-overlay">
+        <div class="w-12 h-12 border-3 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
     </div>
 
     <!-- Header -->
-    <header class="bg-white shadow-md fixed w-full top-0 z-50 animate-slide-down">
-        <nav class="container mx-auto px-4 py-4">
+    <header class="bg-white/95 backdrop-blur-md shadow-md fixed w-full top-0 z-50 animate-fade-in">
+        <nav class="container mx-auto px-6 py-4">
             <div class="flex justify-between items-center">
                 <div class="flex items-center">
-                    <a href="#" class="text-2xl font-medium text-primary-600"><?php echo htmlspecialchars($clinic['clinic_name']); ?></a>
+                    <a href="#" class="text-2xl font-heading font-bold text-primary-500"><?php echo htmlspecialchars($clinic['clinic_name']); ?></a>
                 </div>
                 <div class="flex items-center space-x-8">
                     <div class="hidden md:flex space-x-8">
-                        <a href="#home" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="home">
-                            Home
-                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                        </a>
-                        <a href="#about" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="about">
-                            About
-                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                        </a>
-                        <a href="#services" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="services">
-                            Services
-                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                        </a>
-                        <a href="#doctors" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="doctors">
-                            Doctors
-                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                        </a>
-                        <a href="#contact" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="contact">
-                            Contact
-                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                        </a>
+                        <a href="#home" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="home">Home</a>
+                        <a href="#about" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="about">About</a>
+                        <a href="#services-doctors" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="services-doctors">Services & Doctors</a>
+                        <a href="#contact" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="contact">Contact</a>
                     </div>
-                    <a href="login.php" class="bg-primary-600 text-white px-6 py-2 rounded-md hover:bg-primary-700 transition-colors">Login</a>
-                    <button class="md:hidden" id="mobile-menu-button">
-                        <i class="fas fa-bars text-gray-600 text-xl"></i>
+                    <a href="login.php" class="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 hover:scale-110 transition-all duration-300 text-sm font-bold hover:shadow-lg">Login</a>
+                    <button class="md:hidden" id="mobile-menu-button" aria-label="Toggle mobile menu">
+                        <i class="fas fa-bars text-secondary text-xl"></i>
                     </button>
                 </div>
             </div>
             <!-- Mobile Menu -->
             <div class="md:hidden hidden" id="mobile-menu">
                 <div class="flex flex-col space-y-3 mt-4 pb-3">
-                    <a href="#home" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="home">
-                        Home
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                    <a href="#about" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="about">
-                        About
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                    <a href="#services" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="services">
-                        Services
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                    <a href="#doctors" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="doctors">
-                        Doctors
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
-                    <a href="#contact" class="nav-link text-gray-600 hover:text-primary-600 transition-all duration-300 relative group" data-section="contact">
-                        Contact
-                        <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300 group-hover:w-full"></span>
-                    </a>
+                    <a href="#home" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="home">Home</a>
+                    <a href="#about" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="about">About</a>
+                    <a href="#services-doctors" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="services-doctors">Services & Doctors</a>
+                    <a href="#contact" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="contact">Contact</a>
                 </div>
             </div>
         </nav>
     </header>
 
     <!-- Hero Section -->
-    <section id="home" class="hero-section flex items-center justify-center text-center text-white animate-fade-in">
-        <div class="container mx-auto px-4">
-            <h1 class="text-4xl md:text-6xl font-medium mb-6 animate-slide-up"><?php echo htmlspecialchars($home['maintext']); ?></h1>
-            <p class="text-xl md:text-2xl mb-6 animate-slide-up animation-delay-200"><?php echo htmlspecialchars($home['secondtext']); ?></p>
-            <p class="text-lg md:text-xl mb-8 animate-slide-up animation-delay-400"><?php echo htmlspecialchars($home['thirdtext']); ?></p>
-            <a href="#contact" class="bg-primary-600 text-white px-8 py-3 rounded-md text-lg hover:bg-primary-700 transition-colors inline-block animate-slide-up animation-delay-600">Book Appointment</a>
+    <section id="home" class="bg-cover bg-center min-h-[80vh] flex items-center justify-center text-center text-white relative animate-pulse-once" style="background-image: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url('<?php echo htmlspecialchars($home['homePic']); ?>');">
+        <div class="container mx-auto px-6 relative z-10">
+            <h1 class="text-4xl md:text-6xl font-heading font-extrabold leading-tight mb-4 animate-slide-up"><?php echo htmlspecialchars($home['maintext']); ?></h1>
+            <p class="text-lg md:text-2xl font-semibold leading-relaxed mb-4 animate-slide-up animation-delay-100"><?php echo htmlspecialchars($home['secondtext']); ?></p>
+            <p class="text-base md:text-lg font-medium leading-relaxed mb-6 animate-slide-up animation-delay-200"><?php echo htmlspecialchars($home['thirdtext']); ?></p>
+            <a href="#contact" class="inline-flex items-center bg-primary-500 text-white px-6 py-3 rounded-lg text-base font-bold hover:bg-primary-600 hover:scale-110 hover:shadow-lg transition-all duration-300 animate-slide-up animation-delay-300 hover:animate-bounce">
+                <i class="fas fa-calendar-check mr-2 text-lg"></i> Book Appointment
+            </a>
         </div>
     </section>
 
     <!-- About Section -->
-    <section id="about" class="py-24 bg-white">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-col md:flex-row items-center gap-12">
+    <section id="about" class="py-12 bg-gradient-to-r from-primary-100 to-accent-100">
+        <div class="container mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-center gap-8">
                 <div class="md:w-1/2">
-                    <div class="about-image">
-                        <img src="<?php echo htmlspecialchars($about['aboutPic']); ?>" alt="About Us" class="w-full">
-                    </div>
+                    <img src="<?php echo htmlspecialchars($about['aboutPic']); ?>" alt="About Us" class="w-full rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-2 border-primary-500/50">
                 </div>
-                <div class="md:w-1/2 about-content">
-                    <h2 class="text-3xl font-medium text-neutral-dark mb-6">About Us</h2>
-                    <p class="text-secondary-color leading-relaxed"><?php echo htmlspecialchars($about['aboutText']); ?></p>
+                <div class="md:w-1/2">
+                    <h2 class="text-4xl font-heading font-extrabold text-neutral-dark leading-tight mb-4 animate-slide-up">About Us</h2>
+                    <p class="text-base font-medium text-secondary leading-relaxed animate-slide-up animation-delay-100"><?php echo htmlspecialchars($about['aboutText']); ?></p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Services Section -->
-    <section id="services" class="py-24 bg-neutral-light">
-        <div class="container mx-auto px-4">
-            <div class="section-title text-center">
-                <h2 class="text-3xl font-medium text-neutral-dark mb-4">Our Services</h2>
-                <p class="text-secondary-color">Experience comprehensive dental care with our range of professional services.</p>
+    <!-- Services and Doctors Section -->
+    <section id="services-doctors" class="py-12 bg-gradient-to-r from-primary-100 to-accent-100">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-10">
+                <h2 class="text-4xl font-heading font-extrabold text-neutral-dark leading-tight mb-3 animate-slide-up">Our Services & Doctors</h2>
+                <p class="text-base font-medium text-secondary leading-relaxed max-w-lg mx-auto animate-slide-up animation-delay-100">Meet our expert team and explore our premium dental services.</p>
             </div>
-            
-            <?php
-            // Group services by doctor position
-            $grouped_services = [];
-            foreach ($services as $service) {
-                $grouped_services[$service['kind_of_doctor']][] = $service;
-            }
-            
-            foreach ($grouped_services as $position => $position_services):
-            ?>
-            <div class="mb-12 scroll-animation">
-                <h3 class="text-xl font-medium text-gray-800 mb-4 animate-slide-up"><?php echo htmlspecialchars($position); ?></h3>
-                <div class="relative">
-                    <div class="overflow-hidden">
-                        <div class="flex transition-transform duration-300 ease-in-out" id="slider-<?php echo md5($position); ?>">
-                            <?php foreach ($position_services as $index => $service): ?>
-                            <div class="w-full md:w-1/3 lg:w-1/4 flex-shrink-0 px-3 scroll-animation" style="transition-delay: <?php echo $index * 100; ?>ms">
-                                <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col transform hover:-translate-y-2">
-                                    <div class="relative h-48">
-                                        <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" 
-                                             alt="<?php echo htmlspecialchars($service['service_name']); ?>" 
-                                             class="w-full h-full object-cover rounded-t-lg">
-                                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                                        <div class="absolute bottom-0 left-0 right-0 p-4">
-                                            <h4 class="text-lg font-medium text-white mb-1"><?php echo htmlspecialchars($service['service_name']); ?></h4>
-                                            <span class="text-white/80 text-xs"><?php echo htmlspecialchars($service['time']); ?></span>
-                                        </div>
-                                    </div>
-                                    <div class="p-4 flex-grow flex flex-col">
-                                        <p class="text-gray-600 text-sm mb-4 line-clamp-2 flex-grow"><?php echo htmlspecialchars($service['service_description']); ?></p>
-                                        <div class="flex justify-between items-center mt-auto">
-                                            <span class="text-primary-600 font-medium">₱<?php echo number_format($service['price'], 2); ?></span>
-                                            <a href="#contact" class="inline-flex items-center justify-center w-28 px-3 py-2 bg-primary-50 text-primary-600 rounded-md hover:bg-primary-100 text-sm font-medium transition-colors">
-                                                Book Now
-                                                <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                                </svg>
-                                            </a>
-                                        </div>
-                                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Doctors Column -->
+                <div class="bg-primary-50 rounded-2xl shadow-xl border-2 border-primary-500/50 w-full">
+                    <div class="flex justify-between items-center p-6 bg-gradient-to-r from-primary-500 to-accent-300 text-white">
+                        <h3 class="text-2xl font-heading font-bold">Our Doctors</h3>
+                        <button data-modal="doctors-modal" class="inline-flex items-center bg-white text-primary-500 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gradient-to-r hover:from-primary-100 hover:to-accent-100 hover:scale-110 hover:shadow-lg transition-all duration-300 view-all-btn" aria-label="View all doctors">
+                            <i class="fas fa-list mr-2 text-lg hover:animate-spin-slow"></i> View All
+                        </button>
+                    </div>
+                    <div class="p-6 max-h-[432px] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500 scrollbar-track-primary-100">
+                        <div class="grid grid-cols-2 gap-4 md:space-y-4 md:grid-cols-1">
+                            <?php foreach ($doctors as $index => $doctor): ?>
+                            <div class="flex flex-col gap-2 p-4 bg-gray-50 rounded-2xl hover:shadow-2xl hover:scale-[1.02] hover:bg-primary-100/50 transition-all duration-300 animate-slide-up animate-pulse-once h-auto min-h-24 md:flex-row md:items-center md:h-24 border-2 border-primary-500/50" style="animation-delay: <?php echo $index * 100; ?>ms">
+                                <img src="<?php echo htmlspecialchars($doctor['photo']); ?>" alt="<?php echo htmlspecialchars($doctor['name']); ?>" class="w-12 h-12 rounded-full object-cover border-2 border-primary-100 mx-auto md:mx-0">
+                                <div class="flex-1 text-center md:text-left">
+                                    <p class="text-sm font-semibold text-neutral-dark"><?php echo htmlspecialchars($doctor['name']); ?></p>
+                                    <span class="inline-block text-xs font-medium text-primary-500 bg-primary-100 px-2 py-1 rounded-full mt-1"><?php echo htmlspecialchars($doctor['position_name']); ?></span>
                                 </div>
+                                <a href="#contact" class="inline-flex items-center px-4 py-2 bg-accent-300 text-white rounded-lg hover:bg-accent-400 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce mx-auto md:mx-0" aria-label="Book with <?php echo htmlspecialchars($doctor['name']); ?>">
+                                    <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
+                                </a>
                             </div>
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    <button class="absolute left-0 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-primary-50 text-gray-700 hover:text-primary-600 p-1.5 rounded-full shadow-md transition-all duration-300" 
-                            onclick="slideLeft('<?php echo md5($position); ?>')">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                    </button>
-                    <button class="absolute right-0 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-primary-50 text-gray-700 hover:text-primary-600 p-1.5 rounded-full shadow-md transition-all duration-300" 
-                            onclick="slideRight('<?php echo md5($position); ?>')">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </button>
                 </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </section>
-
-    <!-- Doctors Section -->
-    <section id="doctors" class="py-12 bg-white">
-        <div class="container mx-auto px-4">
-            <div class="section-title text-center mb-8">
-                <h2 class="text-2xl font-medium text-neutral-dark mb-2">Our Expert Doctors</h2>
-                <p class="text-secondary-color text-sm">Meet our team of experienced dental professionals</p>
-            </div>
-            
-            <div class="relative">
-                <div class="overflow-hidden">
-                    <div class="flex transition-transform duration-300 ease-in-out" id="doctors-slider">
-                        <?php foreach ($doctors as $doctor): ?>
-                        <div class="w-full sm:w-1/2 md:w-1/3 lg:w-1/4 flex-shrink-0 px-2">
-                            <div class="doctor-card group flex flex-col items-center">
-                                <div class="relative w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-full overflow-hidden mb-3 ring-2 ring-primary-600/10 group-hover:ring-primary-600/30 transition-all duration-300">
-                                    <img src="<?php echo htmlspecialchars($doctor['photo']); ?>" 
-                                         alt="<?php echo htmlspecialchars($doctor['name']); ?>" 
-                                         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <!-- Services Column -->
+                <div class="bg-white rounded-2xl shadow-xl border-2 border-primary-500/50 w-full">
+                    <div class="flex justify-between items-center p-6 bg-gradient-to-r from-primary-500 to-accent-300 text-white">
+                        <h3 class="text-2xl font-heading font-bold">Our Services</h3>
+                        <button data-modal="services-modal" class="inline-flex items-center bg-white text-primary-500 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gradient-to-r hover:from-primary-100 hover:to-accent-100 hover:scale-110 hover:shadow-lg transition-all duration-300 view-all-btn" aria-label="View all services">
+                            <i class="fas fa-list mr-2 text-lg hover:animate-spin-slow"></i> View All
+                        </button>
+                    </div>
+                    <div class="p-6 max-h-[432px] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500 scrollbar-track-gray-100">
+                        <?php
+                        $grouped_services = [];
+                        foreach ($services as $service) {
+                            $grouped_services[$service['kind_of_doctor']][] = $service;
+                        }
+                        foreach ($grouped_services as $position => $position_services):
+                        ?>
+                        <div class="py-4">
+                            <h4 class="text-xl font-heading font-bold text-neutral-dark mb-3 relative">
+                                <?php echo htmlspecialchars($position); ?>
+                                <span class="absolute bottom-0 left-0 w-16 h-1 bg-gradient-to-r from-primary-500 to-accent-300"></span>
+                            </h4>
+                            <!-- Mobile: Card Layout -->
+                            <div class="grid grid-cols-2 gap-4 md:hidden">
+                                <?php foreach ($position_services as $index => $service): ?>
+                                <div class="flex flex-col gap-2 p-4 bg-gray-50 rounded-2xl hover:shadow-2xl hover:scale-[1.02] hover:bg-primary-100/50 transition-all duration-300 animate-slide-up animate-pulse-once h-auto min-h-24 border-2 border-primary-500/50" style="animation-delay: <?php echo $index * 100; ?>ms">
+                                    <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="<?php echo htmlspecialchars($service['service_name']); ?>" class="h-12 w-12 object-cover rounded-md border-2 border-primary-500/50 mx-auto">
+                                    <p class="text-sm font-semibold text-neutral-dark text-center truncate"><?php echo htmlspecialchars($service['service_name']); ?></p>
+                                    <p class="text-xs font-medium text-secondary text-center truncate group relative">
+                                        <?php echo htmlspecialchars($service['service_description']); ?>
+                                        <span class="absolute hidden group-hover:block bg-neutral-dark text-white text-xs rounded-lg p-3 z-10 w-64 shadow-2xl"><?php echo htmlspecialchars($service['service_description']); ?></span>
+                                    </p>
+                                    <p class="text-sm font-semibold text-primary-500 text-center">₱<?php echo number_format($service['price'], 2); ?></p>
+                                    <p class="text-xs font-medium text-secondary text-center"><?php echo htmlspecialchars($service['time']); ?></p>
+                                    <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce w-full justify-center" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                        <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
+                                    </a>
                                 </div>
-                                <div class="text-center transform translate-y-0 group-hover:translate-y-[-4px] transition-transform duration-300">
-                                    <h3 class="text-sm font-medium text-neutral-dark mb-0.5"><?php echo htmlspecialchars($doctor['name']); ?></h3>
-                                    <p class="text-secondary-color text-xs"><?php echo htmlspecialchars($doctor['position_name']); ?></p>
+                                <?php endforeach; ?>
+                            </div>
+                            <!-- Desktop: Row Layout -->
+                            <div class="hidden md:block">
+                                <div class="grid grid-cols-12 gap-4 border-b border-gray-100 pb-2 mb-2">
+                                    <div class="col-span-2 font-semibold text-sm text-gray-600">Image</div>
+                                    <div class="col-span-5 font-semibold text-sm text-gray-600">Service</div>
+                                    <div class="col-span-3 font-semibold text-sm text-gray-600">Price</div>
+                                    <div class="col-span-2 font-semibold text-sm text-gray-600">Action</div>
                                 </div>
+                                <?php foreach ($position_services as $index => $service): ?>
+                                <div class="grid grid-cols-12 gap-4 items-center py-2 border-b border-gray-100 hover:bg-primary-100/70 hover:shadow-md transition-all duration-300 animate-slide-up animate-pulse-once h-24" style="animation-delay: <?php echo $index * 100; ?>ms">
+                                    <div class="col-span-2">
+                                        <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="<?php echo htmlspecialchars($service['service_name']); ?>" class="h-12 w-12 object-cover rounded-md border-2 border-primary-500/50">
+                                    </div>
+                                    <div class="col-span-5">
+                                        <p class="text-base font-semibold text-neutral-dark"><?php echo htmlspecialchars($service['service_name']); ?></p>
+                                        <p class="text-xs font-medium text-secondary line-clamp-1 group relative">
+                                            <?php echo htmlspecialchars($service['service_description']); ?>
+                                            <span class="absolute hidden group-hover:block bg-neutral-dark text-white text-xs rounded-lg p-3 z-10 w-64 shadow-2xl"><?php echo htmlspecialchars($service['service_description']); ?></span>
+                                        </p>
+                                    </div>
+                                    <div class="col-span-3">
+                                        <p class="text-base font-semibold text-primary-500">₱<?php echo number_format($service['price'], 2); ?></p>
+                                        <p class="text-xs font-medium text-secondary"><?php echo htmlspecialchars($service['time']); ?></p>
+                                    </div>
+                                    <div class="col-span-2 flex items-center">
+                                        <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                            <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
+                                        </a>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
-                
-                <!-- Navigation Buttons -->
-                <button class="absolute left-0 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-primary-50 text-gray-700 hover:text-primary-600 p-2 rounded-full shadow-md transition-all duration-300" 
-                        onclick="slideDoctors('left')">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                </button>
-                <button class="absolute right-0 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-primary-50 text-gray-700 hover:text-primary-600 p-2 rounded-full shadow-md transition-all duration-300" 
-                        onclick="slideDoctors('right')">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
             </div>
         </div>
     </section>
 
-    <!-- Contact Section -->
-    <section id="contact" class="py-24 bg-neutral-light">
-        <div class="container mx-auto px-4">
-            <div class="section-title text-center">
-                <h2 class="text-3xl font-medium text-neutral-dark mb-4">Contact Us</h2>
-                <p class="text-secondary-color">Get in touch with us for any questions or to schedule an appointment.</p>
+    <!-- Doctors Modal -->
+    <div id="doctors-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-[1000] hidden" onclick="if(event.target===this) document.getElementById('doctors-modal').classList.add('hidden')">
+        <div class="bg-primary-50 w-full max-w-4xl max-h-[80vh] rounded-2xl shadow-2xl border-2 border-primary-500/20 overflow-hidden flex flex-col m-4">
+            <div class="flex justify-between items-center p-6 bg-gradient-to-r from-primary-500 to-accent-300 text-white">
+                <h3 class="text-2xl font-heading font-bold">All Doctors</h3>
+                <button class="text-white hover:text-accent-100 close-modal hover:animate-spin-slow" data-modal="doctors-modal" aria-label="Close modal">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="contact-card">
-                    <div class="contact-icon">
-                        <i class="fas fa-map-marker-alt text-2xl"></i>
+            <div class="p-6">
+                <input type="text" id="doctors-search" class="w-full p-3 text-base font-medium border border-primary-500/50 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-4 bg-white shadow-sm" placeholder="Search doctors by name..." aria-label="Search doctors">
+                <div class="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500 scrollbar-track-primary-100" id="doctors-list">
+                    <div class="grid grid-cols-2 gap-4 md:space-y-4 md:grid-cols-1">
+                        <?php foreach ($all_doctors as $index => $doctor): ?>
+                        <div class="flex flex-col gap-2 p-4 bg-gray-50 rounded-2xl hover:shadow-2xl hover:scale-[1.02] hover:bg-primary-100/50 transition-all duration-300 doctor-item h-auto min-h-24 md:flex-row md:items-center md:h-24 border-2 border-primary-500/50" data-name="<?php echo htmlspecialchars(strtolower($doctor['name'])); ?>" style="animation-delay: <?php echo $index * 100; ?>ms">
+                            <img src="<?php echo htmlspecialchars($doctor['photo']); ?>" alt="<?php echo htmlspecialchars($doctor['name']); ?>" class="w-12 h-12 rounded-full object-cover border-2 border-primary-100 mx-auto md:mx-0">
+                            <div class="flex-1 text-center md:text-left">
+                                <p class="text-sm font-semibold text-neutral-dark"><?php echo htmlspecialchars($doctor['name']); ?></p>
+                                <span class="inline-block text-xs font-medium text-primary-500 bg-primary-100 px-2 py-1 rounded-full mt-1"><?php echo htmlspecialchars($doctor['position_name']); ?></span>
+                            </div>
+                            <a href="#contact" class="inline-flex items-center px-4 py-2 bg-accent-300 text-white rounded-lg hover:bg-accent-400 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce mx-auto md:mx-0" aria-label="Book with <?php echo htmlspecialchars($doctor['name']); ?>">
+                                <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
+                            </a>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
-                    <h3 class="text-xl font-medium mb-2">Address</h3>
-                    <p class="text-secondary-color"><?php echo htmlspecialchars($clinic['address']); ?></p>
+                    <p class="text-base font-medium text-secondary text-center hidden" id="doctors-no-results">No doctors found.</p>
                 </div>
-                <div class="contact-card">
-                    <div class="contact-icon">
-                        <i class="fas fa-phone text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Services Modal -->
+    <div id="services-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-[1000] hidden" onclick="if(event.target===this) document.getElementById('services-modal').classList.add('hidden')">
+        <div class="bg-white w-full max-w-4xl max-h-[80vh] rounded-2xl shadow-2xl border-2 border-primary-500/20 overflow-hidden flex flex-col m-4">
+            <div class="flex justify-between items-center p-6 bg-gradient-to-r from-primary-500 to-accent-300 text-white">
+                <h3 class="text-2xl font-heading font-bold">All Services</h3>
+                <button class="text-white hover:text-accent-100 close-modal hover:animate-spin-slow" data-modal="services-modal" aria-label="Close modal">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <input type="text" id="services-search" class="w-full p-3 text-base font-medium border border-primary-500/50 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-4 bg-white shadow-sm" placeholder="Search services by name..." aria-label="Search services">
+                <div class="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-500 scrollbar-track-gray-100" id="services-list">
+                    <?php
+                    $grouped_all_services = [];
+                    foreach ($all_services as $service) {
+                        $grouped_all_services[$service['kind_of_doctor']][] = $service;
+                    }
+                    foreach ($grouped_all_services as $position => $position_services):
+                    ?>
+                    <div class="py-4">
+                        <h4 class="text-xl font-heading font-bold text-neutral-dark mb-3 relative">
+                            <?php echo htmlspecialchars($position); ?>
+                            <span class="absolute bottom-0 left-0 w-16 h-1 bg-gradient-to-r from-primary-500 to-accent-300"></span>
+                        </h4>
+                        <!-- Mobile: Card Layout -->
+                        <div class="grid grid-cols-2 gap-4 md:hidden">
+                            <?php foreach ($position_services as $index => $service): ?>
+                            <div class="flex flex-col gap-2 p-4 bg-gray-50 rounded-2xl hover:shadow-2xl hover:scale-[1.02] hover:bg-primary-100/50 transition-all duration-300 service-item h-auto min-h-24 border-2 border-primary-500/50" data-name="<?php echo htmlspecialchars(strtolower($service['service_name'])); ?>" style="animation-delay: <?php echo $index * 100; ?>ms">
+                                <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="<?php echo htmlspecialchars($service['service_name']); ?>" class="h-12 w-12 object-cover rounded-md border-2 border-primary-500/50 mx-auto">
+                                <p class="text-sm font-semibold text-neutral-dark text-center truncate"><?php echo htmlspecialchars($service['service_name']); ?></p>
+                                <p class="text-xs font-medium text-secondary text-center truncate group relative">
+                                    <?php echo htmlspecialchars($service['service_description']); ?>
+                                    <span class="absolute hidden group-hover:block bg-neutral-dark text-white text-xs rounded-lg p-3 z-10 w-64 shadow-2xl"><?php echo htmlspecialchars($service['service_description']); ?></span>
+                                </p>
+                                <p class="text-sm font-semibold text-primary-500 text-center">₱<?php echo number_format($service['price'], 2); ?></p>
+                                <p class="text-xs font-medium text-secondary text-center"><?php echo htmlspecialchars($service['time']); ?></p>
+                                <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce w-full justify-center" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                    <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
+                                </a>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <!-- Desktop: Row Layout -->
+                        <div class="hidden md:block">
+                            <div class="grid grid-cols-12 gap-4 border-b border-gray-100 pb-2 mb-2">
+                                <div class="col-span-2 font-semibold text-sm text-gray-600">Image</div>
+                                <div class="col-span-5 font-semibold text-sm text-gray-600">Service</div>
+                                <div class="col-span-3 font-semibold text-sm text-gray-600">Price</div>
+                                <div class="col-span-2 font-semibold text-sm text-gray-600">Action</div>
+                            </div>
+                            <?php foreach ($position_services as $index => $service): ?>
+                            <div class="grid grid-cols-12 gap-4 items-center py-2 border-b border-gray-100 hover:bg-primary-100/70 hover:shadow-md transition-all duration-300 service-item h-24" data-name="<?php echo htmlspecialchars(strtolower($service['service_name'])); ?>" style="animation-delay: <?php echo $index * 100; ?>ms">
+                                <div class="col-span-2">
+                                    <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="<?php echo htmlspecialchars($service['service_name']); ?>" class="h-12 w-12 object-cover rounded-md border-2 border-primary-500/50">
+                                </div>
+                                <div class="col-span-5">
+                                    <p class="text-base font-semibold text-neutral-dark"><?php echo htmlspecialchars($service['service_name']); ?></p>
+                                    <p class="text-xs font-medium text-secondary line-clamp-1 group relative">
+                                        <?php echo htmlspecialchars($service['service_description']); ?>
+                                        <span class="absolute hidden group-hover:block bg-neutral-dark text-white text-xs rounded-lg p-3 z-10 w-64 shadow-2xl"><?php echo htmlspecialchars($service['service_description']); ?></span>
+                                    </p>
+                                </div>
+                                <div class="col-span-3">
+                                    <p class="text-base font-semibold text-primary-500">₱<?php echo number_format($service['price'], 2); ?></p>
+                                    <p class="text-xs font-medium text-secondary"><?php echo htmlspecialchars($service['time']); ?></p>
+                                </div>
+                                <div class="col-span-2 flex items-center">
+                                    <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                        <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
+                                    </a>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
-                    <h3 class="text-xl font-medium mb-2">Phone</h3>
-                    <p class="text-secondary-color"><?php echo htmlspecialchars($clinic['phone']); ?></p>
+                    <?php endforeach; ?>
+                    <p class="text-base font-medium text-secondary text-center hidden" id="services-no-results">No services found.</p>
                 </div>
-                <div class="contact-card">
-                    <div class="contact-icon">
-                        <i class="fas fa-clock text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Section -->
+    <section id="contact" class="py-12 bg-gradient-to-r from-primary-100 to-accent-100">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-10">
+                <h2 class="text-4xl font-heading font-extrabold text-neutral-dark leading-tight mb-3 animate-slide-up">Contact Us</h2>
+                <p class="text-base font-medium text-secondary leading-relaxed max-w-lg mx-auto animate-slide-up animation-delay-100">Reach out to schedule an appointment or ask any questions.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-slide-up border-2 border-primary-500/50">
+                    <div class="w-12 h-12 bg-primary-100 text-primary-500 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-map-marker-alt text-lg"></i>
                     </div>
-                    <h3 class="text-xl font-medium mb-2">Hours</h3>
-                    <p class="text-secondary-color">
+                    <h3 class="text-base font-bold font-heading mb-2">Address</h3>
+                    <p class="text-sm font-medium text-secondary"><?php echo htmlspecialchars($clinic['address']); ?></p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-slide-up animation-delay-100 border-2 border-primary-500/50">
+                    <div class="w-12 h-12 bg-primary-100 text-primary-500 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-phone text-lg"></i>
+                    </div>
+                    <h3 class="text-base font-bold font-heading mb-2">Phone</h3>
+                    <p class="text-sm font-medium text-secondary"><?php echo htmlspecialchars($clinic['phone']); ?></p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-slide-up animation-delay-200 border-2 border-primary-500/50">
+                    <div class="w-12 h-12 bg-primary-100 text-primary-500 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-clock text-lg"></i>
+                    </div>
+                    <h3 class="text-base font-bold font-heading mb-2">Hours</h3>
+                    <p class="text-sm font-medium text-secondary">
                         Weekdays: <?php echo htmlspecialchars($clinic['hours_weekdays']); ?><br>
                         Saturday: <?php echo htmlspecialchars($clinic['hours_saturday']); ?><br>
                         Sunday: <?php echo htmlspecialchars($clinic['hours_sunday']); ?>
@@ -891,412 +546,242 @@ if (isset($_GET['action'])) {
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-white py-12">
-        <div class="container mx-auto px-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <footer class="bg-neutral-dark text-white py-12">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                 <div>
-                    <h3 class="text-xl font-medium mb-4"><?php echo htmlspecialchars($clinic['clinic_name']); ?></h3>
-                    <p class="text-gray-400"><?php echo htmlspecialchars($clinic['address']); ?></p>
+                    <h3 class="text-lg font-heading font-bold text-primary-100 mb-4"><?php echo htmlspecialchars($clinic['clinic_name']); ?></h3>
+                    <p class="text-sm font-medium text-gray-400"><?php echo htmlspecialchars($clinic['address']); ?></p>
                 </div>
                 <div>
-                    <h3 class="text-xl font-medium mb-4">Contact Info</h3>
-                    <p class="text-gray-400">
+                    <h3 class="text-lg font-heading font-bold text-primary-100 mb-4">Contact Info</h3>
+                    <p class="text-sm font-medium text-gray-400">
                         Phone: <?php echo htmlspecialchars($clinic['phone']); ?><br>
                         Email: <?php echo htmlspecialchars($clinic['email']); ?>
                     </p>
                 </div>
                 <div>
-                    <h3 class="text-xl font-medium mb-4">Business Hours</h3>
-                    <p class="text-gray-400">
+                    <h3 class="text-lg font-heading font-bold text-primary-100 mb-4">Business Hours</h3>
+                    <p class="text-sm font-medium text-gray-400">
                         Weekdays: <?php echo htmlspecialchars($clinic['hours_weekdays']); ?><br>
                         Saturday: <?php echo htmlspecialchars($clinic['hours_saturday']); ?><br>
                         Sunday: <?php echo htmlspecialchars($clinic['hours_sunday']); ?>
                     </p>
                 </div>
             </div>
-            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p>&copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($clinic['clinic_name']); ?>. All rights reserved.</p>
+            <div class="border-t border-gray-700 pt-6 text-center text-sm font-medium text-gray-400">
+                <p>© <?php echo date('Y'); ?> <?php echo htmlspecialchars($clinic['clinic_name']); ?>. All rights reserved.</p>
             </div>
         </div>
     </footer>
 
     <!-- jQuery -->
-    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- DataTables JS -->
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
 
     <script>
         // Mobile menu toggle
-        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        document.getElementById('mobile-menu-button').addEventListener('click', () => {
             document.getElementById('mobile-menu').classList.toggle('hidden');
         });
 
-        // Smooth scrolling for anchor links
+        // Smooth scrolling
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
+            anchor.addEventListener('click', e => {
                 e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
+                document.querySelector(anchor.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
             });
         });
 
-        let sliderPositions = {};
-
-        function initializeSlider(sliderId) {
-            const slider = document.getElementById(`slider-${sliderId}`);
-            if (!sliderPositions[sliderId]) {
-                sliderPositions[sliderId] = 0;
-            }
-            updateSliderPosition(sliderId);
-        }
-
-        function slideLeft(sliderId) {
-            const slider = document.getElementById(`slider-${sliderId}`);
-            const items = slider.children;
-            const itemWidth = items[0].offsetWidth;
-            const maxPosition = -(items.length - 4) * itemWidth;
-            
-            sliderPositions[sliderId] = Math.min(0, sliderPositions[sliderId] + itemWidth);
-            updateSliderPosition(sliderId);
-        }
-
-        function slideRight(sliderId) {
-            const slider = document.getElementById(`slider-${sliderId}`);
-            const items = slider.children;
-            const itemWidth = items[0].offsetWidth;
-            const maxPosition = -(items.length - 4) * itemWidth;
-            
-            sliderPositions[sliderId] = Math.max(maxPosition, sliderPositions[sliderId] - itemWidth);
-            updateSliderPosition(sliderId);
-        }
-
-        function updateSliderPosition(sliderId) {
-            const slider = document.getElementById(`slider-${sliderId}`);
-            slider.style.transform = `translateX(${sliderPositions[sliderId]}px)`;
-        }
-
-        // Initialize all sliders on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            <?php foreach ($grouped_services as $position => $services): ?>
-            initializeSlider('<?php echo md5($position); ?>');
-            <?php endforeach; ?>
-        });
-
+        // Navigation Active Link
         function updateActiveNavLink() {
             const sections = document.querySelectorAll('section[id]');
             const navLinks = document.querySelectorAll('.nav-link');
-            
             sections.forEach(section => {
                 const rect = section.getBoundingClientRect();
                 const navLink = document.querySelector(`.nav-link[data-section="${section.id}"]`);
-                
                 if (rect.top <= 100 && rect.bottom >= 100) {
-                    navLinks.forEach(link => link.classList.remove('active'));
+                    navLinks.forEach(link => {
+                        link.classList.remove('active', 'text-primary-500', 'after:w-full');
+                    });
                     if (navLink) {
-                        navLink.classList.add('active');
+                        navLink.classList.add('active', 'text-primary-500', 'after:w-full');
                     }
                 }
             });
         }
 
-        // Update active link on scroll
-        window.addEventListener('scroll', updateActiveNavLink);
-        
-        // Update active link on page load
-        document.addEventListener('DOMContentLoaded', updateActiveNavLink);
+        // Scroll Animation
+        function handleScrollAnimation() {
+            const elements = document.querySelectorAll('[class*="animate-"]');
+            elements.forEach(element => {
+                const rect = element.getBoundingClientRect();
+                if (rect.top < window.innerHeight - 100 && rect.bottom > 0) {
+                    element.classList.add('animate-slide-up', 'animate-pulse-once');
+                }
+            });
+        }
 
-        // Update active link when clicking navigation links
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', function(e) {
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                this.classList.add('active');
+        // Modal Handling
+        document.querySelectorAll('.view-all-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const modalId = button.dataset.modal;
+                document.getElementById(modalId).classList.remove('hidden');
             });
         });
 
-        function animateOnScroll() {
-            const elements = document.querySelectorAll('.animate-fadeInUp, .animate-slideInLeft, .animate-slideInRight, .animate-scaleIn');
-            
-            elements.forEach(element => {
-                const elementTop = element.getBoundingClientRect().top;
-                const elementBottom = element.getBoundingClientRect().bottom;
-                
-                if (elementTop < window.innerHeight && elementBottom > 0) {
-                    element.style.opacity = '1';
-                    element.style.transform = 'translateY(0)';
+        document.querySelectorAll('.close-modal').forEach(button => {
+            button.addEventListener('click', () => {
+                const modalId = button.dataset.modal;
+                document.getElementById(modalId).classList.add('hidden');
+                // Reset search
+                const searchInput = document.getElementById(modalId === 'doctors-modal' ? 'doctors-search' : 'services-search');
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+            });
+        });
+
+        // Doctors Search
+        document.getElementById('doctors-search').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const items = document.querySelectorAll('#doctors-list .doctor-item');
+            const noResults = document.getElementById('doctors-no-results');
+            let hasResults = false;
+
+            items.forEach(item => {
+                const name = item.dataset.name;
+                if (name.includes(query)) {
+                    item.style.display = '';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
                 }
             });
-        }
 
-        // Run animation check on scroll
-        window.addEventListener('scroll', animateOnScroll);
-        
-        // Run animation check on page load
-        document.addEventListener('DOMContentLoaded', animateOnScroll);
+            noResults.style.display = hasResults ? 'none' : 'block';
+        });
 
-        // Add this to your existing script
-        document.addEventListener('DOMContentLoaded', function() {
-            // Remove loading overlay after page loads
+        // Services Search
+        document.getElementById('services-search').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const items = document.querySelectorAll('#services-list .service-item');
+            const noResults = document.getElementById('services-no-results');
+            let hasResults = false;
+
+            items.forEach(item => {
+                const name = item.dataset.name;
+                if (name.includes(query)) {
+                    item.style.display = '';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            noResults.style.display = hasResults ? 'none' : 'block';
+        });
+
+        // Page Load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Remove loading overlay
             setTimeout(() => {
                 const overlay = document.querySelector('.loading-overlay');
-                overlay.classList.add('fade-out');
-                setTimeout(() => {
-                    overlay.remove();
-                }, 500);
-            }, 800);
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => overlay.remove(), 400);
+            }, 600);
 
-            // Animate sections on scroll
-            const sections = document.querySelectorAll('section');
-            const observerOptions = {
-                threshold: 0.1,
-                rootMargin: '0px 0px -50px 0px'
-            };
+            // Scroll and nav events
+            window.addEventListener('scroll', () => {
+                updateActiveNavLink();
+                handleScrollAnimation();
+            });
+            updateActiveNavLink();
+            handleScrollAnimation();
 
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('fade-in-scale');
-                        observer.unobserve(entry.target);
-                    }
+            // Nav link click
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', function() {
+                    document.querySelectorAll('.nav-link').forEach(l => {
+                        l.classList.remove('active', 'text-primary-500', 'after:w-full');
+                    });
+                    this.classList.add('active', 'text-primary-500', 'after:w-full');
                 });
-            }, observerOptions);
-
-            sections.forEach(section => {
-                section.style.opacity = '0';
-                observer.observe(section);
             });
 
-            // Animate navigation items
-            const navItems = document.querySelectorAll('.nav-link');
-            navItems.forEach((item, index) => {
-                item.style.opacity = '0';
-                item.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    item.style.transition = 'all 0.5s ease-out';
-                    item.style.opacity = '1';
-                    item.style.transform = 'translateY(0)';
-                }, 100 * index);
-            });
-
-            // Animate service cards
-            const serviceCards = document.querySelectorAll('.service-card');
-            serviceCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.5s ease-out';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, 200 * index);
-            });
-
-            // Ensure hero section is visible
-            const heroSection = document.querySelector('.hero-section');
-            if (heroSection) {
-                heroSection.style.display = 'flex';
-                heroSection.style.visibility = 'visible';
-                heroSection.style.opacity = '1';
-            }
-
-            // Check if home data is loaded
+            // Debug home data
             console.log('Home data:', <?php echo json_encode($home); ?>);
         });
 
-        // Add this to your existing script
-        function handleScrollAnimation() {
-            const elements = document.querySelectorAll('.scroll-animation');
-            
-            elements.forEach(element => {
-                const elementTop = element.getBoundingClientRect().top;
-                const elementBottom = element.getBoundingClientRect().bottom;
-                
-                if (elementTop < window.innerHeight - 100 && elementBottom > 0) {
-                    element.classList.add('visible');
-                }
-            });
-        }
-
-        // Run on scroll
-        window.addEventListener('scroll', handleScrollAnimation);
-        
-        // Run on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            handleScrollAnimation();
-            
-            // Add page transition effect
-            document.body.classList.add('page-transition');
-        });
-
-        // Handle navigation clicks
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const targetId = this.getAttribute('href');
-                const targetElement = document.querySelector(targetId);
-                
-                if (targetElement) {
-                    // Add fade out to current section
-                    const currentSection = document.querySelector('section:target');
-                    if (currentSection) {
-                        currentSection.style.opacity = '0';
-                        currentSection.style.transition = 'opacity 0.3s ease-out';
-                    }
-                    
-                    // Scroll to target
-                    targetElement.scrollIntoView({
-                        behavior: 'smooth'
-                    });
-                    
-                    // Add fade in to target section
-                    setTimeout(() => {
-                        targetElement.style.opacity = '1';
-                        targetElement.style.transition = 'opacity 0.3s ease-in';
-                    }, 300);
-                }
-            });
-        });
-
-        // Add this to your existing script section
-        let doctorsSliderPosition = 0;
-        const doctorsSlider = document.getElementById('doctors-slider');
-        const doctorsItems = doctorsSlider.children;
-        let itemWidth = doctorsItems[0].offsetWidth;
-        let maxPosition = -(doctorsItems.length - 4) * itemWidth;
-
-        function updateSliderDimensions() {
-            itemWidth = doctorsItems[0].offsetWidth;
-            const visibleItems = window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 3 : window.innerWidth >= 640 ? 2 : 1;
-            maxPosition = -(doctorsItems.length - visibleItems) * itemWidth;
-            doctorsSliderPosition = Math.max(maxPosition, Math.min(0, doctorsSliderPosition));
-            doctorsSlider.style.transform = `translateX(${doctorsSliderPosition}px)`;
-        }
-
-        function slideDoctors(direction) {
-            if (direction === 'left') {
-                doctorsSliderPosition = Math.min(0, doctorsSliderPosition + itemWidth);
-            } else {
-                doctorsSliderPosition = Math.max(maxPosition, doctorsSliderPosition - itemWidth);
-            }
-            doctorsSlider.style.transform = `translateX(${doctorsSliderPosition}px)`;
-        }
-
-        // Initialize slider on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            // Your existing initialization code...
-            
-            // Initialize doctors slider
-            if (doctorsSlider) {
-                updateSliderDimensions();
-                window.addEventListener('resize', updateSliderDimensions);
-            }
-        });
-
-        // Initialize DataTable for appointments if needed
+        // AJAX for Time Slots
         $(document).ready(function() {
-            // Filter doctors based on selected service
             $('#serviceSelect').on('change', function() {
                 const selectedOption = $(this).find('option:selected');
                 const requiredDoctor = selectedOption.data('doctor');
-                
-                if (requiredDoctor) {
-                    $('#doctorSelect option').each(function() {
-                        const doctorPosition = $(this).data('position');
-                        if (doctorPosition === requiredDoctor || $(this).val() === '') {
-                            $(this).show();
-                        } else {
-                            $(this).hide();
-                        }
-                    });
-                } else {
-                    $('#doctorSelect option').show();
-                }
-                
-                // Reset doctor selection
+                $('#doctorSelect option').each(function() {
+                    const doctorPosition = $(this).data('position');
+                    if (doctorPosition === requiredDoctor || $(this).val() === '') {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
                 $('#doctorSelect').val('');
-                
-                // Clear time slots
                 $('#timeSelect').html('<option value="">Select Time</option>');
             });
-            
-            // Update available time slots when date, service, or doctor changes
+
             $('#appointmentDate, #serviceSelect, #doctorSelect').on('change', function() {
-                updateTimeSlots();
+                const date = $('#appointmentDate').val();
+                const serviceId = $('#serviceSelect').val();
+                const doctorId = $('#doctorSelect').val();
+                if (!date || !serviceId || !doctorId) {
+                    $('#timeSelect').html('<option value="">Please select all required fields</option>');
+                    return;
+                }
+                $('#timeSelect').html('<option value="">Loading time slots...</option>');
+                $.ajax({
+                    url: 'index.php',
+                    type: 'GET',
+                    data: {
+                        page: 'schedule',
+                        action: 'get_time_slots',
+                        date: date,
+                        service_id: serviceId,
+                        doctor_id: doctorId
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            let options = '<option value="">Select Time</option>';
+                            if (response.slots?.length) {
+                                response.slots.forEach(slot => {
+                                    options += `<option value="${slot}">${slot}</option>`;
+                                });
+                            } else {
+                                options = '<option value="">No available time slots</option>';
+                            }
+                            $('#timeSelect').html(options);
+                        } else {
+                            $('#timeSelect').html('<option value="">No available time slots</option>');
+                            if (response.message) alert(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX Error:', status, error, xhr.responseText);
+                        $('#timeSelect').html('<option value="">Error loading time slots</option>');
+                        let errorMessage = 'Error loading time slots. ';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.message) errorMessage += response.message;
+                        } catch (e) {
+                            errorMessage += 'Please try again.';
+                        }
+                        alert(errorMessage);
+                    }
+                });
             });
         });
-
-        function openAppointmentModal() {
-            document.getElementById('appointmentModal').classList.remove('hidden');
-        }
-
-        function closeAppointmentModal() {
-            document.getElementById('appointmentModal').classList.add('hidden');
-        }
-
-        function updateTimeSlots() {
-            const date = $('#appointmentDate').val();
-            const serviceId = $('#serviceSelect').val();
-            const doctorId = $('#doctorSelect').val();
-            
-            if (!date || !serviceId || !doctorId) {
-                $('#timeSelect').html('<option value="">Please select all required fields</option>');
-                return;
-            }
-            
-            // Clear existing options
-            $('#timeSelect').html('<option value="">Loading time slots...</option>');
-            
-            // Fetch available time slots
-            $.ajax({
-                url: 'index.php',
-                type: 'GET',
-                data: {
-                    page: 'schedule',
-                    action: 'get_time_slots',
-                    date: date,
-                    service_id: serviceId,
-                    doctor_id: doctorId
-                },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        let options = '<option value="">Select Time</option>';
-                        
-                        if (response.slots && response.slots.length > 0) {
-                            response.slots.forEach(function(slot) {
-                                options += `<option value="${slot}">${slot}</option>`;
-                            });
-                        } else {
-                            options = '<option value="">No available time slots</option>';
-                        }
-                        
-                        $('#timeSelect').html(options);
-                    } else {
-                        $('#timeSelect').html('<option value="">No available time slots</option>');
-                        if (response.message) {
-                            alert(response.message);
-                        }
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('AJAX Error:', status, error);
-                    console.error('Response Text:', xhr.responseText);
-                    $('#timeSelect').html('<option value="">Error loading time slots</option>');
-                    
-                    // Show more detailed error message
-                    let errorMessage = 'Error loading time slots. ';
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.message) {
-                            errorMessage += response.message;
-                        }
-                    } catch (e) {
-                        errorMessage += 'Please try again.';
-                    }
-                    alert(errorMessage);
-                }
-            });
-        }
 
         function updateStatus(id, status) {
             if (confirm(`Are you sure you want to mark this appointment as ${status}?`)) {
@@ -1307,4 +792,4 @@ if (isset($_GET['action'])) {
         }
     </script>
 </body>
-</html> 
+</html>

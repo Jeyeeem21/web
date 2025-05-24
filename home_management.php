@@ -224,37 +224,37 @@ $stmt = $pdo->query("SELECT * FROM about WHERE status = 1 ORDER BY createdDate D
 $aboutContents = $stmt->fetchAll();
 ?>
 
-<div id="home_management" class="space-y-6">
-    <h2 class="text-xl font-medium text-gray-800">Content Management</h2>
+<div id="home_management" class="space-y-6 bg-neutral-light p-6 md:p-8 animate-fade-in">
+    <h2 class="text-2xl md:text-3xl font-heading font-bold text-primary-500">Content Management</h2>
     
     <!-- Tabs for Information Sections -->
-    <div class="border-b border-gray-200">
-        <ul class="flex flex-wrap -mb-px text-sm">
+    <div class="border-b border-primary-100">
+        <ul class="flex flex-wrap -mb-px text-sm overflow-x-auto">
             <li class="mr-2">
-                <a href="index.php?page=information" class="inline-block p-3 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300">Overview</a>
+                <a href="index.php?page=information" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Overview</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=home_management" class="inline-block p-3 border-b-2 border-primary-600 text-primary-600">Data</a>
+                <a href="index.php?page=home_management" class="inline-block p-3 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-t-lg hover:brightness-110 hover:scale-105 transition-all duration-200">Data</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=doctor_position_management" class="inline-block p-3 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300">Services</a>
+                <a href="index.php?page=doctor_position_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Services</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=staff_management" class="inline-block p-3 border-b-2 border-transparent hover:text-gray-600 hover:border-gray-300">Staff</a>
+                <a href="index.php?page=staff_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Staff</a>
             </li>
         </ul>
     </div>
     
     <!-- Success Message -->
     <?php if (isset($_GET['success'])): ?>
-    <div id="successAlert" class="bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
+    <div id="successAlert" class="bg-success-50 border border-success-200 text-success-800 px-3 py-2 rounded-lg text-sm flex justify-between items-center">
         <span>
             <?php 
             if ($_GET['success'] == 'added') echo 'Content added successfully!';
             if ($_GET['success'] == 'updated') echo 'Content updated successfully!';
             ?>
         </span>
-        <button type="button" onclick="document.getElementById('successAlert').style.display = 'none'" class="text-green-600">
+        <button type="button" onclick="document.getElementById('successAlert').style.display = 'none'" class="text-success-600">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -272,75 +272,83 @@ $aboutContents = $stmt->fetchAll();
     <?php endif; ?>
     
     <!-- Home Content Section -->
-    <div class="bg-white rounded-lg shadow p-6 mb-6">
+    <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-md transition-all duration-200 p-6">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-medium text-gray-900">Home Content</h3>
-            <button type="button" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md text-sm flex items-center" onclick="openAddHomeModal()">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
+            <h3 class="text-lg font-medium text-neutral-dark">Home Content</h3>
+            <button type="button" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-3 py-1.5 rounded-lg text-sm flex items-center hover:scale-105 transition-all duration-200" onclick="openAddHomeModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
                 Add Home Content
-        </button>
-    </div>
+            </button>
+        </div>
     
         <!-- Home Content Table -->
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200" id="homeTable">
-            <thead>
-                <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Image</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Main Text</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-                <?php foreach ($homeContents as $content): ?>
-                    <tr id="home-row-<?php echo $content['id']; ?>" class="hover:bg-gray-50">
-                    <td class="px-4 py-2 whitespace-nowrap">
-                        <?php if (!empty($content['homePic'])): ?>
-                        <img src="<?php echo htmlspecialchars($content['homePic']); ?>" alt="Home Image" class="h-8 w-12 object-cover rounded-md border border-gray-200">
-                        <?php else: ?>
-                        <span class="text-gray-400 text-xs">No image</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="px-4 py-2">
-                        <div class="text-sm text-gray-900 truncate max-w-xs"><?php echo htmlspecialchars(substr($content['maintext'], 0, 50)) . (strlen($content['maintext']) > 50 ? '...' : ''); ?></div>
-                    </td>
-                    <td class="px-4 py-2 whitespace-nowrap">
-                        <div class="text-sm text-gray-900"><?php echo date('M d, Y H:i', strtotime($content['createdDate'])); ?></div>
-                    </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-sm">
-                        <div class="flex space-x-1">
-                                <button type="button" class="text-primary-600 hover:text-primary-800" onclick="useHomeContent(<?php echo $content['id']; ?>)">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                            </button>
-                                <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditHomeModal(<?php echo $content['id']; ?>, '<?php echo addslashes($content['maintext']); ?>', '<?php echo addslashes($content['secondtext']); ?>', '<?php echo addslashes($content['thirdtext']); ?>', '<?php echo addslashes($content['homePic']); ?>')">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                                <button type="button" class="text-red-600 hover:text-red-800" onclick="deleteHomeContent(<?php echo $content['id']; ?>)">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-                </div>
-            </div>
+            <table id="homeTable" class="min-w-full divide-y divide-primary-100 border-separate border-spacing-0 mobile-card-view">
+                <thead class="bg-neutral-light">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Home Image</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Main Text</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Second Text</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Third Text</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Created Date</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-primary-100">
+                    <?php foreach ($homeContents as $content): ?>
+                    <tr id="home-row-<?php echo $content['id']; ?>" class="hover:bg-primary-50 transition-colors duration-200">
+                        <td class="px-4 py-2">
+                            <?php if (!empty($content['homePic'])): ?>
+                            <img src="<?php echo htmlspecialchars($content['homePic']); ?>" alt="Home Image" class="h-10 w-10 object-cover rounded-lg border border-primary-100">
+                            <?php else: ?>
+                            <span class="text-gray-400 text-xs">No image</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="px-4 py-2">
+                            <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($content['maintext'], 0, 50)) . (strlen($content['maintext']) > 50 ? '...' : ''); ?></div>
+                        </td>
+                        <td class="px-4 py-2">
+                            <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($content['secondtext'], 0, 50)) . (strlen($content['secondtext']) > 50 ? '...' : ''); ?></div>
+                        </td>
+                        <td class="px-4 py-2">
+                            <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($content['thirdtext'], 0, 50)) . (strlen($content['thirdtext']) > 50 ? '...' : ''); ?></div>
+                        </td>
+                        <td class="px-4 py-2 whitespace-nowrap">
+                            <div class="text-sm text-neutral-dark"><?php echo date('M d, Y H:i', strtotime($content['createdDate'])); ?></div>
+                        </td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm">
+                            <div class="flex space-x-1">
+                                <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="useHomeContent(<?php echo $content['id']; ?>)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </button>
+                                <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditHomeModal(<?php echo $content['id']; ?>, '<?php echo addslashes($content['maintext']); ?>', '<?php echo addslashes($content['secondtext']); ?>', '<?php echo addslashes($content['thirdtext']); ?>', '<?php echo addslashes($content['homePic']); ?>')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                                <button type="button" class="text-accent-500 hover:text-accent-600 transition-colors duration-200" onclick="deleteHomeContent(<?php echo $content['id']; ?>)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <!-- About Content Section -->
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-xl border border-primary-100 shadow-sm hover:shadow-md transition-all duration-200 p-6">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-medium text-gray-900">About Content</h3>
-            <button type="button" class="bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-md text-sm flex items-center" onclick="openAddAboutModal()">
+            <h3 class="text-lg font-medium text-neutral-dark">About Content</h3>
+            <button type="button" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-3 py-1.5 rounded-lg text-sm flex items-center hover:scale-105 transition-all duration-200" onclick="openAddAboutModal()">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
@@ -350,49 +358,49 @@ $aboutContents = $stmt->fetchAll();
         
         <!-- About Content Table -->
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200" id="aboutTable">
-                <thead>
+            <table id="aboutTable" class="min-w-full divide-y divide-primary-100 border-separate border-spacing-0 mobile-card-view">
+                <thead class="bg-neutral-light">
                     <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">About Text</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Image</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">About Text</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Created Date</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wider border-b border-primary-100">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody class="bg-white divide-y divide-primary-100">
                     <?php foreach ($aboutContents as $content): ?>
-                    <tr id="about-row-<?php echo $content['id']; ?>" class="hover:bg-gray-50">
-                        <td class="px-4 py-2 whitespace-nowrap">
+                    <tr id="about-row-<?php echo $content['id']; ?>" class="hover:bg-primary-50 transition-colors duration-200">
+                        <td class="px-4 py-2">
                             <?php if (!empty($content['aboutPic'])): ?>
-                            <img src="<?php echo htmlspecialchars($content['aboutPic']); ?>" alt="About Image" class="h-8 w-12 object-cover rounded-md border border-gray-200">
-                    <?php else: ?>
+                            <img src="<?php echo htmlspecialchars($content['aboutPic']); ?>" alt="About Image" class="h-10 w-10 object-cover rounded-lg border border-primary-100">
+                            <?php else: ?>
                             <span class="text-gray-400 text-xs">No image</span>
-                    <?php endif; ?>
+                            <?php endif; ?>
                         </td>
                         <td class="px-4 py-2">
-                            <div class="text-sm text-gray-900 truncate max-w-xs"><?php echo htmlspecialchars(substr($content['aboutText'], 0, 50)) . (strlen($content['aboutText']) > 50 ? '...' : ''); ?></div>
+                            <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($content['aboutText'], 0, 50)) . (strlen($content['aboutText']) > 50 ? '...' : ''); ?></div>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap">
-                            <div class="text-sm text-gray-900"><?php echo date('M d, Y H:i', strtotime($content['createdDate'])); ?></div>
+                            <div class="text-sm text-neutral-dark"><?php echo date('M d, Y H:i', strtotime($content['createdDate'])); ?></div>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm">
                             <div class="flex space-x-1">
-                                <button type="button" class="text-primary-600 hover:text-primary-800" onclick="useAboutContent(<?php echo $content['id']; ?>)">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </button>
-                                <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openEditAboutModal(<?php echo $content['id']; ?>, '<?php echo addslashes($content['aboutPic']); ?>', '<?php echo addslashes($content['aboutText']); ?>')">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                    </button>
-                                <button type="button" class="text-red-600 hover:text-red-800" onclick="deleteAboutContent(<?php echo $content['id']; ?>)">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
+                                <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="useAboutContent(<?php echo $content['id']; ?>)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </button>
+                                <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditAboutModal(<?php echo $content['id']; ?>, '<?php echo addslashes($content['aboutPic']); ?>', '<?php echo addslashes($content['aboutText']); ?>')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                                <button type="button" class="text-accent-500 hover:text-accent-600 transition-colors duration-200" onclick="deleteAboutContent(<?php echo $content['id']; ?>)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -402,67 +410,68 @@ $aboutContents = $stmt->fetchAll();
     </div>
 
     <!-- Home Content Modal -->
-    <div id="homeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div id="homeModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
             <div class="mt-3">
-                <h3 class="text-lg font-medium text-gray-900" id="homeModalTitle">Add Home Content</h3>
+                <h3 class="text-lg font-medium text-neutral-dark" id="homeModalTitle">Add Home Content</h3>
                 <form id="homeForm" method="POST" enctype="multipart/form-data" class="mt-4">
                     <input type="hidden" name="action" value="add_home">
                     <input type="hidden" name="id" id="homeId">
                     
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Home Image</label>
-                        <input type="file" name="homePic" id="homePic" accept="image/*" class="mt-1 block w-full">
-    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Main Text</label>
-                        <textarea name="maintext" id="homeMainText" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                        <label class="block text-sm font-medium text-neutral-dark">Home Image</label>
+                        <input type="file" name="homePic" id="homePic" accept="image/*" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
                     
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Second Text</label>
-                        <textarea name="secondtext" id="homeSecondText" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                        <label class="block text-sm font-medium text-neutral-dark">Main Text</label>
+                        <textarea name="maintext" id="homeMainText" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
                     </div>
                     
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">Third Text</label>
-                        <textarea name="thirdtext" id="homeThirdText" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                        <label class="block text-sm font-medium text-neutral-dark">Second Text</label>
+                        <textarea name="secondtext" id="homeSecondText" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
                     </div>
                     
-                <div class="flex justify-end space-x-2">
-                        <button type="button" onclick="closeHomeModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save</button>
-                </div>
-            </form>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Third Text</label>
+                        <textarea name="thirdtext" id="homeThirdText" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="closeHomeModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">Save</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
     
     <!-- About Content Modal -->
-    <div id="aboutModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+    <div id="aboutModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
             <div class="mt-3">
-                <h3 class="text-lg font-medium text-gray-900" id="aboutModalTitle">Add About Content</h3>
+                <h3 class="text-lg font-medium text-neutral-dark" id="aboutModalTitle">Add About Content</h3>
                 <form id="aboutForm" method="POST" enctype="multipart/form-data" class="mt-4">
                     <input type="hidden" name="action" value="add_about">
                     <input type="hidden" name="id" id="aboutId">
                     
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">About Image</label>
-                        <input type="file" name="aboutPic" id="aboutPic" accept="image/*" class="mt-1 block w-full">
+                        <label class="block text-sm font-medium text-neutral-dark">About Image</label>
+                        <input type="file" name="aboutPic" id="aboutPic" accept="image/*" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
                     
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700">About Text</label>
-                        <textarea name="aboutText" id="aboutText" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+                        <label class="block text-sm font-medium text-neutral-dark">About Text</label>
+                        <textarea name="aboutText" id="aboutText" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
                     </div>
                     
-                <div class="flex justify-end space-x-2">
-                        <button type="button" onclick="closeAboutModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save</button>
-                </div>
-            </form>
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="closeAboutModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">Save</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -492,19 +501,19 @@ $(document).ready(function() {
         drawCallback: function() {
             // Custom pagination styling
             $('.dataTables_paginate').addClass('flex justify-center mt-4');
-            $('.paginate_button').addClass('px-2 py-1 mx-0.5 rounded text-xs cursor-pointer');
-            $('.paginate_button.current').addClass('bg-primary-600 text-white');
-            $('.paginate_button:not(.current)').addClass('bg-gray-100 text-gray-700 hover:bg-gray-200');
+            $('.paginate_button').addClass('px-2 py-1 mx-0.5 rounded-lg text-xs cursor-pointer');
+            $('.paginate_button.current').addClass('bg-primary-500 text-white');
+            $('.paginate_button:not(.current)').addClass('bg-neutral-light text-neutral-dark hover:bg-primary-50');
             $('.paginate_button.disabled').addClass('opacity-50 cursor-not-allowed');
             
             // Ensure clickable area for next/previous buttons
             $('.paginate_button.next, .paginate_button.previous').addClass('px-3');
             
             // Custom length menu styling
-            $('.dataTables_length select').addClass('rounded-md border-gray-300 text-sm');
+            $('.dataTables_length select').addClass('rounded-lg border-primary-100 text-sm');
             
             // Custom search box styling
-            $('.dataTables_filter input').addClass('rounded-md border-gray-300 text-sm');
+            $('.dataTables_filter input').addClass('rounded-lg border-primary-100 text-sm');
         }
     };
 
