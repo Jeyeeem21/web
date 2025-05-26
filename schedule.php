@@ -219,6 +219,126 @@ if (isset($_GET['action'])) {
             exit();
         }
     }
+
+    // Get receipt details
+    if ($_GET['action'] === 'get_receipt_details' && isset($_GET['id'])) {
+        // Ensure no output before JSON response
+        ob_clean();
+        header('Content-Type: application/json');
+        
+        try {
+            // Check if payment table exists, if not create it
+            $stmt = $pdo->query("SHOW TABLES LIKE 'payment'");
+            if ($stmt->rowCount() === 0) {
+                // Create payment table
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS payment (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        appointment_id INT NOT NULL,
+                        amount DECIMAL(10,2) NOT NULL,
+                        payment_method VARCHAR(50) NOT NULL,
+                        payment_date DATE NOT NULL,
+                        payment_time TIME NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (appointment_id) REFERENCES appointments(id)
+                    )
+                ");
+            }
+
+            // Get appointment and payment details
+            $stmt = $pdo->prepare("
+                SELECT 
+                    a.id,
+                    a.appointment_date,
+                    a.appointment_time,
+                    p.name as patient_name,
+                    s.service_name,
+                    s.price as service_price,
+                    COALESCE(pm.payment_date, a.appointment_date) as payment_date,
+                    COALESCE(pm.payment_time, a.appointment_time) as payment_time,
+                    COALESCE(pm.amount, s.price) as amount,
+                    COALESCE(pm.payment_method, 'Cash') as payment_method,
+                    st.name as doctor_name,
+                    st.id as doctor_id
+                FROM appointments a
+                JOIN patients p ON a.patient_id = p.id
+                JOIN services s ON a.service_id = s.id
+                JOIN staff st ON a.staff_id = st.id
+                LEFT JOIN payment pm ON a.id = pm.appointment_id
+                WHERE a.id = ?
+            ");
+            $stmt->execute([$_GET['id']]);
+            $receipt = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$receipt) {
+                throw new Exception("Receipt not found for appointment ID: " . $_GET['id']);
+            }
+
+            // Get clinic details with logo
+            $stmt = $pdo->query("SELECT * FROM clinic_details ORDER BY created_at DESC LIMIT 1");
+            $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$clinic) {
+                throw new Exception("Clinic details not found");
+            }
+
+            // Get doctor details
+            $stmt = $pdo->prepare("
+                SELECT s.*, dp.doctor_position 
+                FROM staff s 
+                LEFT JOIN doctor_position dp ON s.doctor_position_id = dp.id 
+                WHERE s.id = ?
+            ");
+            $stmt->execute([$receipt['doctor_id']]);
+            $doctor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$doctor) {
+                throw new Exception("Doctor details not found for ID: " . $receipt['doctor_id']);
+            }
+
+            // Format dates and times
+            $receipt['payment_date'] = date('F j, Y', strtotime($receipt['payment_date']));
+            $receipt['payment_time'] = date('g:i A', strtotime($receipt['payment_time']));
+            $receipt['appointment_date'] = date('F j, Y', strtotime($receipt['appointment_date']));
+            $receipt['appointment_time'] = date('g:i A', strtotime($receipt['appointment_time']));
+
+            // Prepare clinic details
+            $clinicDetails = [
+                'name' => $clinic['clinic_name'],
+                'logo' => $clinic['logo'],
+                'address' => $clinic['address'],
+                'phone' => $clinic['phone'],
+                'email' => $clinic['email'],
+                'hours_weekdays' => $clinic['hours_weekdays'],
+                'hours_saturday' => $clinic['hours_saturday'],
+                'hours_sunday' => $clinic['hours_sunday']
+            ];
+
+            // Log successful response for debugging
+            error_log("Receipt details retrieved successfully for appointment ID: " . $_GET['id']);
+
+            echo json_encode([
+                'success' => true,
+                'receipt' => $receipt,
+                'clinic' => $clinicDetails,
+                'doctor' => $doctor
+            ]);
+            exit;
+        } catch (Exception $e) {
+            // Log the error for debugging
+            error_log("Error in get_receipt_details: " . $e->getMessage());
+            
+            echo json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'debug_info' => [
+                    'appointment_id' => $_GET['id'] ?? 'not set',
+                    'error' => $e->getMessage()
+                ]
+            ]);
+            exit;
+        }
+    }
 }
 
 // Get clinic details for operating hours
