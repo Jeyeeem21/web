@@ -41,13 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     header("Location: doctor_dashboard.php");
                 } else if ($user['role'] === 'assistant') {
                     // Get the doctor this assistant is assigned to
-                    $stmt = $pdo->prepare("SELECT doctor_id FROM doctor WHERE assistant_id = ?");
+                    $stmt = $pdo->prepare("SELECT d.doctor_id, s.name as doctor_name 
+                                         FROM doctor d 
+                                         JOIN staff s ON d.doctor_id = s.id 
+                                         WHERE d.assistant_id = ?");
                     $stmt->execute([$user['staff_id']]);
                     $doctor = $stmt->fetch();
+                    
                     if ($doctor) {
                         $_SESSION['assigned_doctor_id'] = $doctor['doctor_id'];
+                        $_SESSION['assigned_doctor_name'] = $doctor['doctor_name'];
+                        header("Location: doctor_dashboard.php");
+                    } else {
+                        $_SESSION['error'] = "No doctor assigned to this assistant";
+                        header("Location: login.php");
                     }
-                    header("Location: index.php");
                 }
             }
             exit();

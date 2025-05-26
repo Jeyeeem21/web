@@ -1034,7 +1034,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_paginated_appointments') {
     <div id="paymentModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-6 border w-full max-w-md md:w-[90%] shadow-lg rounded-xl bg-white border-primary-100">
             <div class="mt-3">
-                <h3 class="text-lg font-medium text-neutral-dark">Record Payment</h3>
+                <h3 class="text-lg font-medium text-black">Record Payment</h3>
                 <form id="paymentForm" method="POST" class="mt-4 space-y-4">
                     <input type="hidden" name="action" value="record_payment">
                     <input type="hidden" name="appointment_id" id="paymentAppointmentId">
@@ -1066,12 +1066,12 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_paginated_appointments') {
                     <!-- QR Code Container (initially hidden) -->
                     <div id="qrCodeContainer" class="mb-4 text-center hidden">
                         <label class="block text-sm font-medium text-neutral-dark mb-2">Scan to Pay (GCash)</label>
-                        <img src="Uploads/Qrcode/GCash-MyQr.jpg" alt="GCash QR Code" class="mx-auto rounded-lg shadow-sm max-w-xs">
+                        <img src="<?php echo htmlspecialchars($clinic['qrcode'] ?? ''); ?>" alt="GCash QR Code" class="mx-auto rounded-lg shadow-sm max-w-xs">
                     </div>
                     
                     <div class="flex justify-end space-x-3">
                         <button type="button" onclick="closePaymentModal()" class="px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-all duration-200">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-success-500 to-success-600 text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Record Payment</button>
+                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-success-500 to-success-600 text-black rounded-lg text-sm hover:scale-105 transition-all duration-200">Record Payment</button>
                     </div>
                 </form>
             </div>

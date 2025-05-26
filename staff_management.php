@@ -565,9 +565,6 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
                 <a href="index.php?page=information" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Overview</a>
             </li>
             <li class="mr-2">
-                <a href="index.php?page=home_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Data</a>
-            </li>
-            <li class="mr-2">
                 <a href="index.php?page=doctor_position_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Services</a>
             </li>
             <li class="mr-2">
@@ -578,7 +575,7 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
     
     <!-- Success Message -->
     <?php if (isset($_GET['success'])): ?>
-    <div id="successAlert" class="bg-success-50 border border-success-200 text-success-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
+    <div id="successAlert" class="bg-success-50 border border-success-200 text-success-800 px-4 py-3 rounded-lg text-sm flex justify-between items-center shadow-sm">
         <span>
             <?php 
             if ($_GET['success'] == 'added') echo 'Staff added successfully!';
@@ -587,40 +584,24 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($_GET['success'] == 'assistant_assigned') echo 'Assistant assigned successfully!';
             ?>
         </span>
-        <button type="button" onclick="document.getElementById('successAlert').style.display = 'none'" class="text-success-600">
+        <button type="button" onclick="document.getElementById('successAlert').style.display = 'none'" class="text-success-600 hover:text-success-800">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
     </div>
-    <script>
-        setTimeout(function() {
-            const successAlert = document.getElementById('successAlert');
-            if (successAlert) {
-                successAlert.style.display = 'none';
-            }
-        }, 5000);
-    </script>
     <?php endif; ?>
     
     <!-- Error Message -->
     <?php if (isset($_GET['error'])): ?>
-    <div id="errorAlert" class="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
+    <div id="errorAlert" class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm flex justify-between items-center shadow-sm">
         <span><?php echo htmlspecialchars($_GET['error']); ?></span>
-        <button type="button" onclick="document.getElementById('errorAlert').style.display = 'none'" class="text-red-600">
+        <button type="button" onclick="document.getElementById('errorAlert').style.display = 'none'" class="text-red-600 hover:text-red-800">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
     </div>
-    <script>
-        setTimeout(function() {
-            const errorAlert = document.getElementById('errorAlert');
-            if (errorAlert) {
-                errorAlert.style.display = 'none';
-            }
-        }, 5000);
-    </script>
     <?php endif; ?>
     
     <!-- Staff Section -->
@@ -652,28 +633,28 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
                     <tr class="hover:bg-primary-50 transition-colors duration-200" id="staff-row-<?php echo $member['id']; ?>">
                         <td class="px-4 py-2">
                             <?php if (!empty($member['photo'])): ?>
-                            <img src="<?php echo htmlspecialchars($member['photo']); ?>" alt="Staff Photo" class="h-12 w-12 rounded-full object-cover">
+                            <img src="<?php echo htmlspecialchars($member['photo']); ?>" alt="Staff Photo" class="h-10 w-10 rounded-full object-cover">
                             <?php else: ?>
-                            <div class="h-12 w-12 rounded-full bg-neutral-light flex items-center justify-center">
+                            <div class="h-10 w-10 rounded-full bg-neutral-light flex items-center justify-center">
                                 <span class="text-secondary text-xs">No photo</span>
                             </div>
                             <?php endif; ?>
                         </td>
                         <td class="px-4 py-2">
-                            <div class="text-sm font-medium text-neutral-dark"><?php echo htmlspecialchars($member['name']); ?></div>
+                            <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($member['name']); ?></div>
                             <div class="text-xs text-secondary"><?php echo htmlspecialchars($member['gmail']); ?></div>
                         </td>
                         <td class="px-4 py-2">
-                            <div class="text-sm font-medium text-neutral-dark"><?php echo ucfirst($member['role']); ?></div>
+                            <div class="text-sm text-neutral-dark"><?php echo ucfirst($member['role']); ?></div>
                             <?php if ($member['role'] == 'doctor' && !empty($member['doctor_position'])): ?>
-                            <div class="text-xs text-primary-500"><?php echo htmlspecialchars($member['doctor_position']); ?></div>
+                            <div class="text-xs text-secondary"><?php echo htmlspecialchars($member['doctor_position']); ?></div>
                             <?php endif; ?>
                         </td>
                         <td class="px-4 py-2">
                             <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($member['contact']); ?></div>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm">
-                            <div class="flex space-x-2">
+                            <div class="flex space-x-1">
                                 <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditModal(<?php echo $member['id']; ?>)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -714,21 +695,20 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
                     <?php foreach ($doctors as $doctor): ?>
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-2">
-                            <div class="text-sm font-medium text-gray-900"><?php echo htmlspecialchars($doctor['doctor_name']); ?></div>
+                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($doctor['doctor_name']); ?></div>
                         </td>
                         <td class="px-4 py-2">
-                            <div class="text-sm font-medium text-primary-600"><?php echo htmlspecialchars($doctor['doctor_position'] ?: 'N/A'); ?></div>
+                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($doctor['doctor_position'] ?: 'N/A'); ?></div>
                         </td>
                         <td class="px-4 py-2">
-                            <div class="text-sm font-medium text-gray-700"><?php echo htmlspecialchars($doctor['assistant_name'] ?: 'None'); ?></div>
+                            <div class="text-sm text-gray-900"><?php echo htmlspecialchars($doctor['assistant_name'] ?: 'None'); ?></div>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm">
                             <div class="flex space-x-1">
-                                <button type="button" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500" onclick="openAssignAssistantModal(<?php echo $doctor['doctor_id']; ?>, '<?php echo htmlspecialchars($doctor['assistant_id']); ?>')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <button type="button" class="text-blue-600 hover:text-blue-800" onclick="openAssignAssistantModal(<?php echo $doctor['doctor_id']; ?>, '<?php echo htmlspecialchars($doctor['assistant_id']); ?>')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
-                                    Assign
                                 </button>
                             </div>
                         </td>
@@ -872,126 +852,86 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Add Staff Modal -->
-    <div id="addStaffModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="flex items-center justify-between p-4 border-b border-primary-100">
-                <h3 class="text-lg font-medium text-neutral-dark">Add New Staff</h3>
-                <button type="button" class="text-secondary hover:text-neutral-dark transition-colors duration-200" onclick="closeAddModal()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <form id="addStaffForm" class="p-4" enctype="multipart/form-data">
-                <div class="space-y-4">
-                    <div>
-                        <label for="name" class="block text-sm font-medium text-neutral-dark">Name</label>
-                        <input type="text" id="name" name="name" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+    <!-- Staff Modal -->
+    <div id="staffModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-neutral-dark" id="modalTitle">Add Staff</h3>
+                <form id="staffForm" method="POST" enctype="multipart/form-data" class="mt-4">
+                    <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="id" id="staffId">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Name</label>
+                        <input type="text" name="name" id="name" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
-                    <div>
-                        <label for="gmail" class="block text-sm font-medium text-neutral-dark">Email</label>
-                        <input type="email" id="gmail" name="gmail" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Address</label>
+                        <textarea name="address" id="address" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
                     </div>
-                    <div>
-                        <label for="contact" class="block text-sm font-medium text-neutral-dark">Contact</label>
-                        <input type="text" id="contact" name="contact" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Contact</label>
+                        <input type="text" name="contact" id="contact" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                     </div>
-                    <div>
-                        <label for="role" class="block text-sm font-medium text-neutral-dark">Role</label>
-                        <select id="role" name="role" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                            <option value="">Select Role</option>
-                            <option value="doctor">Doctor</option>
-                            <option value="nurse">Nurse</option>
-                            <option value="receptionist">Receptionist</option>
-                            <option value="admin">Admin</option>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Email</label>
+                        <input type="email" name="gmail" id="gmail" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Birthdate</label>
+                        <input type="date" name="birthdate" id="birthdate" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Gender</label>
+                        <select name="gender" id="gender" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500" onchange="toggleOtherGender()">
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
                         </select>
                     </div>
-                    <div id="doctorPositionField" class="hidden">
-                        <label for="doctor_position" class="block text-sm font-medium text-neutral-dark">Doctor Position</label>
-                        <select id="doctor_position" name="doctor_position" class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                    
+                    <div id="otherGenderDiv" class="mb-4 hidden">
+                        <label class="block text-sm font-medium text-neutral-dark">Specify Gender</label>
+                        <input type="text" name="other_gender" id="other_gender" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Role</label>
+                        <select name="role" id="role" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500" onchange="toggleRoleFields()">
+                            <option value="">Select Role</option>
+                            <option value="admin">Admin</option>
+                            <option value="doctor">Doctor</option>
+                            <option value="assistant">Assistant</option>
+                        </select>
+                    </div>
+                    
+                    <div id="doctorPositionDiv" class="mb-4 hidden">
+                        <label class="block text-sm font-medium text-neutral-dark">Doctor Position</label>
+                        <select name="doctor_position_id" id="doctor_position_id" class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                             <option value="">Select Position</option>
-                            <?php foreach ($doctorPositions as $position): ?>
-                            <option value="<?php echo $position['id']; ?>"><?php echo htmlspecialchars($position['position_name']); ?></option>
+                            <?php foreach ($positions as $position): ?>
+                            <option value="<?php echo $position['id']; ?>"><?php echo htmlspecialchars($position['doctor_position']); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div>
-                        <label for="photo" class="block text-sm font-medium text-neutral-dark">Photo</label>
-                        <input type="file" id="photo" name="photo" accept="image/*" class="mt-1 block w-full text-sm text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-500 hover:file:bg-primary-100">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-neutral-dark">Photo</label>
+                        <input type="file" name="photo" id="photo" accept="image/*" class="mt-1 block w-full">
                     </div>
-                </div>
-                <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" onclick="closeAddModal()" class="px-4 py-2 text-sm font-medium text-secondary bg-white border border-primary-100 rounded-md hover:bg-neutral-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-md hover:from-primary-600 hover:to-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200">
-                        Add Staff
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Edit Staff Modal -->
-    <div id="editStaffModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="flex items-center justify-between p-4 border-b border-primary-100">
-                <h3 class="text-lg font-medium text-neutral-dark">Edit Staff</h3>
-                <button type="button" class="text-secondary hover:text-neutral-dark transition-colors duration-200" onclick="closeEditModal()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                    
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save</button>
+                    </div>
+                </form>
             </div>
-            <form id="editStaffForm" class="p-4" enctype="multipart/form-data">
-                <input type="hidden" id="edit_id" name="id">
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit_name" class="block text-sm font-medium text-neutral-dark">Name</label>
-                        <input type="text" id="edit_name" name="name" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                    </div>
-                    <div>
-                        <label for="edit_gmail" class="block text-sm font-medium text-neutral-dark">Email</label>
-                        <input type="email" id="edit_gmail" name="gmail" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                    </div>
-                    <div>
-                        <label for="edit_contact" class="block text-sm font-medium text-neutral-dark">Contact</label>
-                        <input type="text" id="edit_contact" name="contact" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                    </div>
-                    <div>
-                        <label for="edit_role" class="block text-sm font-medium text-neutral-dark">Role</label>
-                        <select id="edit_role" name="role" required class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                            <option value="">Select Role</option>
-                            <option value="doctor">Doctor</option>
-                            <option value="nurse">Nurse</option>
-                            <option value="receptionist">Receptionist</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                    <div id="editDoctorPositionField" class="hidden">
-                        <label for="edit_doctor_position" class="block text-sm font-medium text-neutral-dark">Doctor Position</label>
-                        <select id="edit_doctor_position" name="doctor_position" class="mt-1 block w-full rounded-md border-primary-100 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                            <option value="">Select Position</option>
-                            <?php foreach ($doctorPositions as $position): ?>
-                            <option value="<?php echo $position['id']; ?>"><?php echo htmlspecialchars($position['position_name']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="edit_photo" class="block text-sm font-medium text-neutral-dark">Photo</label>
-                        <input type="file" id="edit_photo" name="photo" accept="image/*" class="mt-1 block w-full text-sm text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-500 hover:file:bg-primary-100">
-                    </div>
-                </div>
-                <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm font-medium text-secondary bg-white border border-primary-100 rounded-md hover:bg-neutral-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-md hover:from-primary-600 hover:to-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200">
-                        Update Staff
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -1239,191 +1179,133 @@ $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize DataTables only if they haven't been initialized
-    if (!$.fn.DataTable.isDataTable('#staffTable')) {
-        $('#staffTable').DataTable({
-            responsive: true,
-            order: [[1, 'asc']],
-            pageLength: 10,
-            language: {
-                search: "",
-                searchPlaceholder: "Search staff..."
-            }
-        });
+function calculateAge(birthdate) {
+    const birth = new Date(birthdate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
     }
-
-    if (!$.fn.DataTable.isDataTable('#doctorsTable')) {
-        $('#doctorsTable').DataTable({
-            responsive: true,
-            order: [[0, 'asc']],
-            pageLength: 10,
-            language: {
-                search: "",
-                searchPlaceholder: "Search doctors..."
-            }
-        });
-    }
-
-    if (!$.fn.DataTable.isDataTable('#usersTable')) {
-        $('#usersTable').DataTable({
-            responsive: true,
-            order: [[0, 'asc']],
-            pageLength: 10,
-            language: {
-                search: "",
-                searchPlaceholder: "Search users..."
-            }
-        });
-    }
-
-    // Handle role change to show/hide doctor position field
-    document.getElementById('role')?.addEventListener('change', function() {
-        const doctorPositionField = document.getElementById('doctorPositionField');
-        doctorPositionField.classList.toggle('hidden', this.value !== 'doctor');
-    });
-
-    document.getElementById('edit_role')?.addEventListener('change', function() {
-        const doctorPositionField = document.getElementById('editDoctorPositionField');
-        doctorPositionField.classList.toggle('hidden', this.value !== 'doctor');
-    });
-
-    // Handle add staff form submission
-    document.getElementById('addStaffForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        formData.append('action', 'add');
-
-        fetch('staff_management.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('success', data.message);
-                closeAddModal();
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                showMessage('error', data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showMessage('error', 'An error occurred while adding staff.');
-        });
-    });
-
-    // Handle edit staff form submission
-    document.getElementById('editStaffForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        formData.append('action', 'edit');
-
-        fetch('staff_management.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('success', data.message);
-                closeEditModal();
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                showMessage('error', data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showMessage('error', 'An error occurred while updating staff.');
-        });
-    });
-});
-
-function openAddModal() {
-    document.getElementById('addStaffModal').classList.remove('hidden');
-    document.getElementById('addStaffModal').classList.add('flex');
-    document.getElementById('addStaffForm').reset();
-    document.getElementById('doctorPositionField').classList.add('hidden');
+    
+    return age;
 }
 
-function closeAddModal() {
-    document.getElementById('addStaffModal').classList.add('hidden');
-    document.getElementById('addStaffModal').classList.remove('flex');
+function openAddModal() {
+    document.getElementById('modalTitle').textContent = 'Add Staff';
+    document.getElementById('staffForm').reset();
+    document.querySelector('#staffForm input[name="action"]').value = 'add';
+    document.getElementById('staffId').value = '';
+    document.getElementById('staffModal').classList.remove('hidden');
+    toggleOtherGender();
+    toggleRoleFields();
 }
 
 function openEditModal(id) {
-    fetch(`staff_management.php?action=get&id=${id}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const staff = data.staff;
-                document.getElementById('edit_id').value = staff.id;
-                document.getElementById('edit_name').value = staff.name;
-                document.getElementById('edit_gmail').value = staff.gmail;
-                document.getElementById('edit_contact').value = staff.contact;
-                document.getElementById('edit_role').value = staff.role;
-                
-                const doctorPositionField = document.getElementById('editDoctorPositionField');
-                if (staff.role === 'doctor') {
-                    doctorPositionField.classList.remove('hidden');
-                    document.getElementById('edit_doctor_position').value = staff.doctor_position_id;
-                } else {
-                    doctorPositionField.classList.add('hidden');
-                }
-
-                document.getElementById('editStaffModal').classList.remove('hidden');
-                document.getElementById('editStaffModal').classList.add('flex');
-            } else {
-                showMessage('error', data.message);
+    fetch('ajax_handler.php?action=get&id=' + id)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
             }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            document.getElementById('modalTitle').textContent = 'Edit Staff';
+            document.querySelector('#staffForm input[name="action"]').value = 'edit';
+            document.getElementById('staffId').value = id;
+            
+            document.getElementById('name').value = data.name || '';
+            document.getElementById('address').value = data.address || '';
+            document.getElementById('contact').value = data.contact || '';
+            document.getElementById('gmail').value = data.gmail || '';
+            document.getElementById('birthdate').value = data.birthdate || '';
+            
+            document.getElementById('gender').value = data.gender || '';
+            document.getElementById('role').value = data.role || '';
+            
+            document.getElementById('doctorPositionDiv').classList.add('hidden');
+            document.getElementById('doctor_position_id').value = '';
+            
+            if (data.role === 'doctor') {
+                document.getElementById('doctorPositionDiv').classList.remove('hidden');
+                document.getElementById('doctor_position_id').value = data.doctor_position_id || '';
+            }
+            
+            document.getElementById('otherGenderDiv').classList.add('hidden');
+            document.getElementById('other_gender').value = '';
+            
+            if (!['Male', 'Female'].includes(data.gender)) {
+                document.getElementById('gender').value = 'Other';
+                document.getElementById('otherGenderDiv').classList.remove('hidden');
+                document.getElementById('other_gender').value = data.gender || '';
+            }
+            
+            document.getElementById('staffModal').classList.remove('hidden');
         })
         .catch(error => {
             console.error('Error:', error);
-            showMessage('error', 'An error occurred while fetching staff details.');
+            alert('Error loading staff details: ' + error.message);
         });
 }
 
-function closeEditModal() {
-    document.getElementById('editStaffModal').classList.add('hidden');
-    document.getElementById('editStaffModal').classList.remove('flex');
+document.getElementById('birthdate').addEventListener('change', function() {
+    // Age is calculated automatically on the server side
+    // No need to set a value here
+});
+
+function closeModal() {
+    document.getElementById('staffModal').classList.add('hidden');
+}
+
+function closeCredentialsModal() {
+    document.getElementById('credentialsModal').classList.add('hidden');
+    window.location.href = 'index.php?page=staff_management&success=added';
+}
+
+function toggleOtherGender() {
+    const gender = document.getElementById('gender').value;
+    const otherGenderDiv = document.getElementById('otherGenderDiv');
+    otherGenderDiv.classList.toggle('hidden', gender !== 'Other');
+}
+
+function toggleRoleFields() {
+    const role = document.getElementById('role').value;
+    const doctorPositionDiv = document.getElementById('doctorPositionDiv');
+    doctorPositionDiv.classList.toggle('hidden', role !== 'doctor');
 }
 
 function deleteStaff(id) {
-    if (confirm('Are you sure you want to delete this staff member?')) {
-        fetch('staff_management.php', {
-            method: 'POST',
+    if (confirm('Are you sure you want to mark this staff member as inactive?')) {
+        fetch(`index.php?page=staff_management&action=delete&id=${id}`, {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `action=delete&id=${id}`
+                'Accept': 'application/json'
+            }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
-                showMessage('success', data.message);
                 document.getElementById(`staff-row-${id}`).remove();
+                alert('Staff member marked as inactive successfully');
             } else {
-                showMessage('error', data.message);
+                alert('Error marking staff member as inactive: ' + data.error);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showMessage('error', 'An error occurred while deleting staff.');
+            alert('Error marking staff member as inactive: ' + error.message);
         });
     }
-}
-
-function showMessage(type, message) {
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = message;
-    messageDiv.className = `p-4 mb-4 rounded-lg ${type === 'success' ? 'bg-success-50 text-success-700' : 'bg-error-50 text-error-700'}`;
-    messageDiv.classList.remove('hidden');
-    
-    setTimeout(() => {
-        messageDiv.classList.add('hidden');
-    }, 5000);
 }
 
 <?php if (isset($_GET['action']) && $_GET['action'] == 'show_credentials' && isset($_GET['staff_id'])): ?>
@@ -1540,6 +1422,69 @@ document.getElementById('toggleAddUserPassword')?.addEventListener('click', func
     }
 });
 
+$(document).ready(function() {
+    // Common DataTable configuration
+    const commonConfig = {
+        responsive: true,
+        language: {
+            search: "",
+            searchPlaceholder: "Search...",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            paginate: {
+                first: "«",
+                last: "»",
+                next: "›",
+                previous: "‹"
+            }
+        },
+        dom: '<"flex flex-col md:flex-row justify-between items-center mb-4"<"mb-4 md:mb-0"l><"flex items-center"f>>rtip',
+        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+        pageLength: 10,
+        scrollX: false,
+        autoWidth: false,
+        drawCallback: function() {
+            // Custom pagination styling
+            $('.dataTables_paginate').addClass('flex justify-center mt-4');
+            $('.paginate_button').addClass('px-2 py-1 mx-0.5 rounded text-xs cursor-pointer');
+            $('.paginate_button.current').addClass('bg-primary-600 text-white');
+            $('.paginate_button:not(.current)').addClass('bg-gray-100 text-gray-700 hover:bg-gray-200');
+            $('.paginate_button.disabled').addClass('opacity-50 cursor-not-allowed');
+            
+            // Ensure clickable area for next/previous buttons
+            $('.paginate_button.next, .paginate_button.previous').addClass('px-3');
+            
+            // Custom length menu styling
+            $('.dataTables_length select').addClass('rounded-md border-gray-300 text-sm');
+            
+            // Custom search box styling
+            $('.dataTables_filter input').addClass('rounded-md border-gray-300 text-sm');
+        }
+    };
+
+    // Initialize DataTables with common configuration
+    $('#staffTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
+    });
+
+    $('#doctorsTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
+    });
+
+    $('#usersTable').DataTable({
+        ...commonConfig,
+        columnDefs: [
+            { orderable: false, targets: -1 }
+        ]
+    });
+});
+
 // Schedule Management Functions
 function openAddScheduleModal() {
     document.getElementById('addScheduleModal').classList.remove('hidden');
@@ -1593,149 +1538,7 @@ function deleteSchedule(id) {
 </script>
 
 <style>
-/* Base styles */
-:root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --secondary-color: #64748b;
-    --success-color: #22c55e;
-    --danger-color: #ef4444;
-    --warning-color: #f59e0b;
-    --info-color: #3b82f6;
-    --light-bg: #f8fafc;
-    --border-color: #e2e8f0;
-}
-
-/* Card styles */
-.card {
-    background: white;
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Doctor position badge */
-.doctor-position {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    background-color: var(--primary-color);
-    color: white;
-    margin-top: 0.25rem;
-}
-
-.doctor-position.specialist {
-    background-color: var(--info-color);
-}
-
-.doctor-position.consultant {
-    background-color: var(--warning-color);
-}
-
-.doctor-position.general {
-    background-color: var(--success-color);
-}
-
-/* Table styles */
-.table-container {
-    overflow-x: auto;
-    border-radius: 0.5rem;
-    background: white;
-}
-
-.custom-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-.custom-table th {
-    background-color: var(--light-bg);
-    padding: 1rem;
-    font-weight: 600;
-    text-align: left;
-    color: var(--secondary-color);
-    border-bottom: 2px solid var(--border-color);
-}
-
-.custom-table td {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.custom-table tr:hover {
-    background-color: var(--light-bg);
-}
-
-/* Button styles */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btn-primary {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: var(--primary-hover);
-}
-
-.btn-icon {
-    padding: 0.5rem;
-    border-radius: 0.375rem;
-}
-
-/* Modal styles */
-.modal {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-}
-
-.modal-content {
-    background: white;
-    border-radius: 1rem;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-/* Form styles */
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-}
-
-.form-input {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
-    transition: all 0.2s ease;
-}
-
-.form-input:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-/* Mobile styles */
+/* Mobile-friendly styles */
 @media (max-width: 640px) {
     .mobile-card-view thead {
         display: none;
@@ -1744,16 +1547,15 @@ function deleteSchedule(id) {
     .mobile-card-view tbody tr {
         display: block;
         margin-bottom: 1rem;
-        border: 1px solid var(--border-color);
-        border-radius: 0.75rem;
-        padding: 1rem;
-        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        padding: 0.75rem;
     }
     
     .mobile-card-view tbody td {
         display: flex;
-        padding: 0.75rem 0;
-        border-bottom: 1px solid var(--border-color);
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f3f4f6;
     }
     
     .mobile-card-view tbody td:last-child {
@@ -1763,61 +1565,31 @@ function deleteSchedule(id) {
     .mobile-card-view tbody td:before {
         content: attr(data-label);
         font-weight: 600;
-        width: 40%;
-        color: var(--secondary-color);
+        width: 30%;
+        color: #6b7280;
     }
     
     .mobile-card-view tbody td > div {
-        width: 60%;
+        width: 70%;
     }
-
-    .doctor-position {
-        margin-top: 0.5rem;
+    
+    /* DataTables mobile adjustments */
+    .dataTables_length, 
+    .dataTables_filter, 
+    .dataTables_info, 
+    .dataTables_paginate {
+        width: 100%;
+        margin-bottom: 0.75rem;
+        text-align: center;
     }
 }
 
-/* DataTables customization */
-.dataTables_wrapper {
-    padding: 1rem;
-}
-
-.dataTables_length select,
-.dataTables_filter input {
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
-    margin: 0 0.5rem;
-}
-
-.dataTables_paginate .paginate_button {
-    padding: 0.5rem 1rem;
-    margin: 0 0.25rem;
-    border-radius: 0.375rem;
-    background: var(--light-bg);
-    color: var(--secondary-color);
-}
-
-.dataTables_paginate .paginate_button.current {
-    background: var(--primary-color);
-    color: white;
-}
-
-/* Alert styles */
-.alert {
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.alert-success {
-    background-color: #dcfce7;
-    border: 1px solid #86efac;
-    color: #166534;
-}
-
-.alert-error {
-    background-color: #fee2e2;
-    border: 1px solid #fca5a5;
-    color: #991b1b;
+/* Modal overlay for mobile */
+@media (max-width: 640px) {
+    .fixed.inset-0 > div {
+        width: 90% !important;
+        max-width: none !important;
+        margin: 0 auto;
+    }
 }
 </style>

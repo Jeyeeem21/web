@@ -287,7 +287,8 @@ try {
 
 <div id="management" class="space-y-6 bg-neutral-light p-6 md:p-8 animate-fade-in">
     <h2 class="text-2xl md:text-3xl font-heading font-bold text-primary-500">Services Management</h2>
-    <!-- Tabs for Information Sections -->
+    
+    <!-- Tabs -->
     <div class="border-b border-primary-100">
         <ul class="flex flex-wrap -mb-px text-sm overflow-x-auto">
             <li class="mr-2">
@@ -307,7 +308,7 @@ try {
 
     <!-- Success/Error Message -->
     <?php if (isset($_GET['success']) || $error): ?>
-    <div id="alert" class="bg-<?php echo $error ? 'red' : 'success'; ?>-50 border border-<?php echo $error ? 'red' : 'success'; ?>-200 text-<?php echo $error ? 'red' : 'success'; ?>-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
+    <div id="alert" class="bg-<?php echo $error ? 'red' : 'success'; ?>-50 border border-<?php echo $error ? 'red' : 'success'; ?>-200 text-<?php echo $error ? 'red' : 'success'; ?>-800 px-4 py-3 rounded-lg text-sm flex justify-between items-center shadow-sm">
         <span>
             <?php 
             if ($error) {
@@ -323,21 +324,12 @@ try {
             }
             ?>
         </span>
-        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red' : 'success'; ?>-600">
+        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red' : 'success'; ?>-600 hover:text-<?php echo $error ? 'red' : 'success'; ?>-800">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
     </div>
-    <script>
-        // Auto hide alert after 5 seconds
-        setTimeout(function() {
-            const alert = document.getElementById('alert');
-            if (alert) {
-                alert.style.display = 'none';
-            }
-        }, 5000);
-    </script>
     <?php endif; ?>
 
     <!-- Doctor Management Section -->
@@ -368,16 +360,16 @@ try {
                     <tbody class="bg-white divide-y divide-primary-100">
                         <?php foreach ($positions as $position): ?>
                         <tr id="position-row-<?php echo $position['id']; ?>" class="hover:bg-primary-50 transition-colors duration-200">
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Position">
                                 <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($position['doctor_position']); ?></div>
                             </td>
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Description">
                                 <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($position['description'], 0, 50)) . (strlen($position['description']) > 50 ? '...' : ''); ?></div>
                             </td>
-                            <td class="px-4 py-2 whitespace-nowrap">
+                            <td class="px-4 py-2 whitespace-nowrap" data-label="Created Date">
                                 <div class="text-sm text-neutral-dark"><?php echo date('M d, Y H:i', strtotime($position['created_at'])); ?></div>
                             </td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm">
+                            <td class="px-4 py-2 whitespace-nowrap text-sm" data-label="Actions">
                                 <div class="flex space-x-1">
                                     <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditDoctorModal(<?php echo $position['id']; ?>, '<?php echo addslashes($position['doctor_position']); ?>', '<?php echo addslashes($position['description']); ?>')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -399,8 +391,8 @@ try {
         </div>
 
         <!-- Doctor Modal -->
-        <div id="doctorModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+        <div id="doctorModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
                 <div class="mt-3">
                     <h3 class="text-lg font-medium text-neutral-dark" id="doctorModalTitle">Add Doctor Position</h3>
                     <form id="doctorForm" method="POST" class="mt-4" onsubmit="return validateDoctorForm()">
@@ -458,25 +450,27 @@ try {
                     <tbody class="bg-white divide-y divide-primary-100">
                         <?php foreach ($services as $service): ?>
                         <tr id="service-row-<?php echo $service['id']; ?>" class="hover:bg-primary-50 transition-colors duration-200">
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Picture">
                                 <div class="text-sm text-neutral-dark">
                                     <?php if ($service['service_picture']): ?>
                                         <img src="<?php echo htmlspecialchars($service['service_picture']); ?>" alt="Service Image" class="h-10 w-10 object-cover rounded-lg">
                                     <?php else: ?>
-                                        No Image
+                                        <div class="h-10 w-10 rounded-lg bg-neutral-light flex items-center justify-center">
+                                            <span class="text-secondary text-xs">No image</span>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Service Name">
                                 <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($service['service_name']); ?></div>
                             </td>
-                            <td class="px-4 py-2">
-                                <div class="text-sm text-neutral-dark truncate max-w-xs"><?php echo htmlspecialchars(substr($service['service_description'], 0, 50)) . (strlen($service['service_description']) > 50 ? '...' : ''); ?></div>
+                            <td class="px-4 py-2" data-label="Description">
+                                <div class="text-sm text-neutral-dark description-cell"><?php echo htmlspecialchars($service['service_description']); ?></div>
                             </td>
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Duration">
                                 <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($service['time']); ?></div>
                             </td>
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Price">
                                 <div class="text-sm text-neutral-dark flex items-center space-x-2">
                                     <span id="price-<?php echo $service['id']; ?>">₱<?php echo number_format($service['price'], 2); ?></span>
                                     <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openPriceModal(<?php echo $service['id']; ?>, <?php echo $service['price']; ?>)">
@@ -486,10 +480,10 @@ try {
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-4 py-2">
+                            <td class="px-4 py-2" data-label="Kind of Doctor">
                                 <div class="text-sm text-neutral-dark"><?php echo htmlspecialchars($service['kind_of_doctor']); ?></div>
                             </td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm">
+                            <td class="px-4 py-2 whitespace-nowrap text-sm" data-label="Actions">
                                 <div class="flex space-x-1">
                                     <button type="button" class="text-primary-500 hover:text-primary-600 transition-colors duration-200" onclick="openEditServiceModal(<?php echo $service['id']; ?>, '<?php echo addslashes($service['service_name']); ?>', '<?php echo addslashes($service['service_description']); ?>', '<?php echo addslashes($service['service_picture']); ?>', <?php echo $service['price']; ?>, '<?php echo addslashes($service['time']); ?>', '<?php echo addslashes($service['kind_of_doctor']); ?>')">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -511,8 +505,8 @@ try {
         </div>
 
         <!-- Service Modal -->
-        <div id="serviceModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+        <div id="serviceModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
                 <div class="mt-3">
                     <h3 class="text-lg font-medium text-neutral-dark" id="serviceModalTitle">Add Service</h3>
                     <form id="serviceForm" method="POST" enctype="multipart/form-data" class="mt-4">
@@ -582,8 +576,8 @@ try {
         </div>
 
         <!-- Price Update Modal -->
-        <div id="priceModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full">
-            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+        <div id="priceModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white">
                 <div class="mt-3">
                     <h3 class="text-lg font-medium text-neutral-dark">Update Price</h3>
                     <form id="priceForm" method="POST" class="mt-4">
@@ -671,6 +665,8 @@ try {
             border-radius: 0.5rem;
             background-color: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            box-sizing: border-box;
         }
         
         #doctorTable.mobile-card-view tbody td,
@@ -679,20 +675,27 @@ try {
             padding: 0.75rem;
             border: none;
             align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            word-break: break-word;
+            white-space: normal;
         }
         
         #doctorTable.mobile-card-view tbody td:before,
         #serviceTable.mobile-card-view tbody td:before {
             content: attr(data-label);
             font-weight: 500;
-            width: 40%;
+            min-width: 120px;
+            max-width: 40%;
             margin-right: 1rem;
             color: #475569;
+            flex-shrink: 0;
         }
         
         #doctorTable.mobile-card-view tbody td .cell-content,
         #serviceTable.mobile-card-view tbody td .cell-content {
             flex: 1;
+            min-width: 0;
         }
         
         /* Adjust first and last cells */
@@ -702,6 +705,125 @@ try {
         }
         
         #doctorTable.mobile-card-view tbody td:last-child,
+        #serviceTable.mobile-card-view tbody td:last-child {
+            padding-bottom: 1rem;
+        }
+
+        /* Adjust specific columns for better mobile display */
+        #serviceTable.mobile-card-view tbody td[data-label="Description"] .text-sm {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        #serviceTable.mobile-card-view tbody td[data-label="Actions"] {
+            justify-content: flex-end;
+        }
+
+        /* Make sure images don't overflow */
+        #serviceTable.mobile-card-view tbody td[data-label="Picture"] img,
+        #serviceTable.mobile-card-view tbody td[data-label="Picture"] div {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Adjust price display */
+        #serviceTable.mobile-card-view tbody td[data-label="Price"] {
+            flex-wrap: wrap;
+        }
+
+        #serviceTable.mobile-card-view tbody td[data-label="Price"] .flex {
+            width: 100%;
+        }
+
+        /* Service table specific mobile styles */
+        #serviceTable.mobile-card-view tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid #ccfbf1;
+            border-radius: 0.5rem;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #serviceTable.mobile-card-view tbody td {
+            display: flex;
+            padding: 0.75rem;
+            border: none;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            word-break: break-word;
+            white-space: normal;
+        }
+
+        #serviceTable.mobile-card-view tbody td:before {
+            content: attr(data-label);
+            font-weight: 500;
+            min-width: 120px;
+            max-width: 40%;
+            margin-right: 1rem;
+            color: #475569;
+            flex-shrink: 0;
+        }
+
+        #serviceTable.mobile-card-view tbody td .text-sm {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Description cell specific styles */
+        #serviceTable.mobile-card-view tbody td[data-label="Description"] .description-cell {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.4;
+        }
+
+        /* Picture cell specific styles */
+        #serviceTable.mobile-card-view tbody td[data-label="Picture"] {
+            justify-content: flex-start;
+        }
+
+        #serviceTable.mobile-card-view tbody td[data-label="Picture"] img,
+        #serviceTable.mobile-card-view tbody td[data-label="Picture"] div {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Price cell specific styles */
+        #serviceTable.mobile-card-view tbody td[data-label="Price"] {
+            flex-wrap: wrap;
+        }
+
+        #serviceTable.mobile-card-view tbody td[data-label="Price"] .flex {
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Actions cell specific styles */
+        #serviceTable.mobile-card-view tbody td[data-label="Actions"] {
+            justify-content: flex-end;
+        }
+
+        #serviceTable.mobile-card-view tbody td[data-label="Actions"] .flex {
+            width: auto;
+        }
+
+        /* Adjust spacing for first and last cells */
+        #serviceTable.mobile-card-view tbody td:first-child {
+            padding-top: 1rem;
+        }
+
         #serviceTable.mobile-card-view tbody td:last-child {
             padding-bottom: 1rem;
         }

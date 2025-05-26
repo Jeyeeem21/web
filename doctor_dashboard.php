@@ -3,21 +3,50 @@ date_default_timezone_set('Asia/Manila'); // Set timezone to Philippine time
 session_start();
 require_once 'config/db.php';
 
-// Check if user is logged in and is a doctor
-if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'doctor') {
+// Check if user is logged in and is a doctor or assistant
+if (!isset($_SESSION['user_role']) || ($_SESSION['user_role'] !== 'doctor' && $_SESSION['user_role'] !== 'assistant')) {
     header("Location: login.php");
     exit();
 }
 
 // Get doctor information
+$doctor_id = $_SESSION['user_role'] === 'assistant' ? $_SESSION['assigned_doctor_id'] : $_SESSION['staff_id'];
+
 $stmt = $pdo->prepare("
-    SELECT s.*, dp.doctor_position 
+    SELECT s.*, dp.doctor_position, d.assistant_id
     FROM staff s 
     LEFT JOIN doctor_position dp ON s.doctor_position_id = dp.id 
+    LEFT JOIN doctor d ON s.id = d.doctor_id
     WHERE s.id = ? AND s.role = 'doctor'
 ");
-$stmt->execute([$_SESSION['staff_id']]);
+$stmt->execute([$doctor_id]);
 $doctor = $stmt->fetch();
+
+// Debug information
+error_log("Doctor ID: " . $doctor_id);
+error_log("Doctor Data: " . print_r($doctor, true));
+
+// Get assistant information if doctor has an assistant
+$assistant = null;
+if ($doctor['assistant_id']) {
+    error_log("Assistant ID found: " . $doctor['assistant_id']);
+    $stmt = $pdo->prepare("
+        SELECT s.* 
+        FROM staff s 
+        WHERE s.id = ? AND s.role = 'assistant'
+    ");
+    $stmt->execute([$doctor['assistant_id']]);
+    $assistant = $stmt->fetch();
+    error_log("Assistant Data: " . print_r($assistant, true));
+} else {
+    error_log("No assistant ID found for doctor");
+}
+
+// Let's also check the doctor table directly
+$stmt = $pdo->prepare("SELECT * FROM doctor WHERE doctor_id = ?");
+$stmt->execute([$doctor_id]);
+$doctorRecord = $stmt->fetch();
+error_log("Doctor Table Record: " . print_r($doctorRecord, true));
 
 // Map the fields correctly
 $doctor['email'] = $doctor['gmail'] ?? 'N/A';
@@ -79,7 +108,7 @@ $stmt = $pdo->prepare("
     WHERE staff_id = ? 
     AND appointment_date BETWEEN ? AND ?
 ");
-$stmt->execute([$_SESSION['staff_id'], $startDate, $endDate]);
+$stmt->execute([$doctor_id, $startDate, $endDate]);
 $statistics = $stmt->fetch();
 
 // Get chart data (completed and cancelled appointments over time) based on selected period
@@ -95,7 +124,7 @@ $sql = "SELECT
         ORDER BY time_period";
 
 $stmt = $pdo->prepare($sql);
-$stmt->execute([$_SESSION['staff_id'], $startDate, $endDate]);
+$stmt->execute([$doctor_id, $startDate, $endDate]);
 $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Populate chart data
@@ -142,12 +171,12 @@ $stmt = $pdo->prepare("
     WHERE a.staff_id = ? AND a.appointment_date = ?
     ORDER BY a.appointment_time ASC
 ");
-$stmt->execute([$_SESSION['staff_id'], $today]);
+$stmt->execute([$doctor_id, $today]);
 $todayAppointments = $stmt->fetchAll();
 
 // Debug information
 error_log("Today's date: " . $today);
-error_log("Staff ID: " . $_SESSION['staff_id']);
+error_log("Staff ID: " . $doctor_id);
 error_log("Number of today's appointments: " . count($todayAppointments));
 
 // Get upcoming appointments (next 7 days from today)
@@ -163,7 +192,7 @@ $stmt = $pdo->prepare("
     AND a.appointment_date != ?
     ORDER BY a.appointment_date ASC, a.appointment_time ASC
 ");
-$stmt->execute([$_SESSION['staff_id'], $today, $nextWeek, $today]);
+$stmt->execute([$doctor_id, $today, $nextWeek, $today]);
 $upcomingAppointments = $stmt->fetchAll();
 
 // Get all active services for appointment modal
@@ -197,6 +226,15 @@ try {
 // Get current date for date pickers
 $serverPHTDate = date('Y-m-d');
 $serverPHTTime = date('H:i:s');
+
+// Get user information for the logged-in doctor
+$stmt = $pdo->prepare("
+    SELECT u.* 
+    FROM users u 
+    WHERE u.staff_id = ? AND u.status = 1
+");
+$stmt->execute([$doctor_id]);
+$user = $stmt->fetch();
 ?>
 
 <!DOCTYPE html>
@@ -215,42 +253,70 @@ $serverPHTTime = date('H:i:s');
         theme: {
             extend: {
                 colors: {
-                        primary: {
-                            50: '#ccfbf1',
-                            100: '#99f6e4',
-                            300: '#4eead3',
-                            500: '#14b8a6',
-                            600: '#0d9488',
-                            700: '#0f766e'
-                        },
+                    primary: {
+                        50: '#ccfbf1',
+                        100: '#99f6e4',
+                        500: '#14b8a6',
+                        600: '#0d9488',
+                        700: '#0f766e'
+                    },
+                    secondary: '#475569',
+                    neutral: {
+                        light: '#f8fafc',
+                        dark: '#1e293b'
+                    },
                     accent: {
                         100: '#fef3c7',
-                        300: '#f59e0b',
+                        300: '#fbbf24',
+                        400: '#f59e0b',
                         500: '#d97706'
-                        },
-                        secondary: '#475569',
-                        neutral: {
-                            light: '#f8fafc',
-                            dark: '#1e293b'
-                        },
-                        success: {
-                            light: '#d1fae5',
-                            DEFAULT: '#10b981',
-                            dark: '#065f46'
-                        },
-                        danger: {
-                            light: '#fee2e2',
-                            DEFAULT: '#ef4444',
-                            dark: '#991b1b'
+                    },
+                    success: {
+                        DEFAULT: '#10b981',
+                        light: '#d1fae5'
                     }
                 },
                 fontFamily: {
                     sans: ['Inter', 'Poppins', 'sans-serif'],
                     heading: ['Poppins', 'sans-serif']
+                },
+                keyframes: {
+                    slideUp: {
+                        '0%': { opacity: '0', transform: 'translateY(20px)' },
+                        '100%': { opacity: '1', transform: 'translateY(0)' }
+                    },
+                    fadeIn: {
+                        '0%': { opacity: '0' },
+                        '100%': { opacity: '1' }
+                    },
+                    spin: {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                    },
+                    spinSlow: {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                    },
+                    pulseOnce: {
+                        '0%, 100%': { opacity: '1' },
+                        '50%': { opacity: '0.8' }
+                    },
+                    scaleHover: {
+                        '0%': { transform: 'scale(1)' },
+                        '100%': { transform: 'scale(1.05)' }
+                    }
+                },
+                animation: {
+                    'slide-up': 'slideUp 0.3s ease-out forwards',
+                    'fade-in': 'fadeIn 0.3s ease-out forwards',
+                    'spin': 'spin 1s linear infinite',
+                    'spin-slow': 'spinSlow 2s linear infinite',
+                    'pulse-once': 'pulseOnce 0.5s ease-in-out',
+                    'scale-hover': 'scaleHover 0.2s ease-in-out forwards'
                 }
             }
         }
-        }
+    }
     </script>
     <style>
         ::-webkit-scrollbar {
@@ -274,23 +340,110 @@ $serverPHTTime = date('H:i:s');
         .hover\:bg-primary-50:hover {
             background-color: #ccfbf1;
         }
+        
+        /* Navigation hover effects */
+        .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        
+        .nav-link span {
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: #14b8a6;
+            transition: width 0.3s ease;
+        }
+        
+        .nav-link:hover span {
+            width: 100%;
+        }
+        
+        .nav-link.active {
+            color: #14b8a6;
+        }
+        
+        .nav-link.active span {
+            width: 100%;
+        }
+        
+        /* Mobile footer navigation */
+        .mobile-nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        
+        .mobile-nav-link span {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #14b8a6;
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+            transform-origin: left;
+        }
+        
+        .mobile-nav-link:hover span {
+            transform: scaleX(1);
+        }
+        
+        .mobile-nav-link.active {
+            color: #14b8a6;
+        }
+        
+        .mobile-nav-link.active span {
+            transform: scaleX(1);
+        }
+        
+        @media (max-width: 768px) {
+            main {
+                padding-bottom: 5rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans">
     <header class="bg-white shadow-md">
-        <div class="container mx-auto px-6 py-4">
+        <div class="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
             <div class="flex justify-between items-center">
                 <div class="flex items-center">
                     <?php if (isset($clinic['logo']) && !empty($clinic['logo'])): ?>
-                        <img src="<?php echo htmlspecialchars($clinic['logo']); ?>" alt="Clinic Logo" class="h-8 w-auto mr-3">
+                        <img src="<?php echo htmlspecialchars($clinic['logo']); ?>" alt="Clinic Logo" class="h-6 sm:h-8 w-auto mr-2 sm:mr-3">
                     <?php endif; ?>
-                    <h1 class="text-xl font-heading font-bold text-primary-500"><?php echo htmlspecialchars($clinic['clinic_name'] ?? 'Clinic'); ?> Doctor Dashboard</h1>
+                    <h1 class="text-base sm:text-xl font-heading font-bold text-primary-500"><?php echo htmlspecialchars($clinic['clinic_name'] ?? 'Clinic'); ?> Doctor Dashboard</h1>
                 </div>
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-4 sm:space-x-6">
+                    <!-- Desktop Navigation -->
+                    <nav class="hidden md:flex items-center space-x-8">
+                        <a href="#statistics" class="nav-link text-neutral-dark hover:text-primary-500 transition-colors duration-200 flex items-center relative group">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            Statistics
+                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-500 transition-all duration-300 group-hover:w-full"></span>
+                        </a>
+                        <a href="#appointments" class="nav-link text-neutral-dark hover:text-primary-500 transition-colors duration-200 flex items-center relative group">
+                            <i class="fas fa-calendar-check mr-2"></i>
+                            Appointments
+                            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-500 transition-all duration-300 group-hover:w-full"></span>
+                        </a>
+                    </nav>
+                    <!-- Doctor Menu -->
                     <div class="relative">
-                        <span class="text-neutral-dark font-medium cursor-pointer hover:text-primary-500 transition-colors duration-100" id="doctorMenuTrigger">Dr. <?php echo htmlspecialchars($doctor['name']); ?> <i class="fas fa-chevron-down text-xs ml-1"></i></span>
+                        <span class="text-sm sm:text-base text-neutral-dark font-medium cursor-pointer hover:text-primary-500 transition-colors duration-100" id="doctorMenuTrigger">
+                            <?php if ($_SESSION['user_role'] === 'assistant'): ?>
+                                <?php echo htmlspecialchars($_SESSION['username']); ?> (Assistant)
+                            <?php else: ?>
+                                Dr. <?php echo htmlspecialchars($doctor['name']); ?>
+                            <?php endif; ?>
+                            <i class="fas fa-chevron-down text-xs ml-1"></i>
+                        </span>
                         <div id="doctorMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden">
-                            <a href="#settings" class="block px-4 py-2 text-sm text-neutral-dark hover:bg-primary-50 transition-colors duration-100">Settings</a>
+                            <?php if ($_SESSION['user_role'] === 'doctor'): ?>
+                                <a href="#" onclick="openSettingsModal(); return false;" class="block px-4 py-2 text-sm text-neutral-dark hover:bg-primary-50 transition-colors duration-100">Settings</a>
+                            <?php endif; ?>
                             <a href="logout.php" class="block px-4 py-2 text-sm text-neutral-dark hover:bg-primary-50 transition-colors duration-100">Logout</a>
                         </div>
                     </div>
@@ -300,11 +453,13 @@ $serverPHTTime = date('H:i:s');
     </header>
 
     <main class="container mx-auto px-6 py-8">
+        <!-- Add IDs to the sections for navigation -->
         <div class="grid grid-cols-1 md:grid-cols-4">
             <!-- Profile Card -->
             <div class="md:col-span-1">
                 <div class="bg-gradient-to-br from-primary-50 to-accent-100 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-4 h-full flex flex-col justify-between">
-                    <div class="text-center">
+                    <!-- Desktop View -->
+                    <div class="hidden md:block text-center">
                         <img src="<?php echo htmlspecialchars($doctor['photo']); ?>" 
                              alt="Doctor Photo" 
                              class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-white shadow-md">
@@ -314,6 +469,21 @@ $serverPHTTime = date('H:i:s');
                             <i class="fas fa-edit mr-1"></i> Edit Profile
                         </button>
                     </div>
+
+                    <!-- Mobile View -->
+                    <div class="md:hidden flex items-center space-x-4 mb-4">
+                        <img src="<?php echo htmlspecialchars($doctor['photo']); ?>" 
+                             alt="Doctor Photo" 
+                             class="w-16 h-16 rounded-full object-cover border-4 border-white shadow-md">
+                        <div>
+                            <h2 class="text-base font-bold text-neutral-dark">Dr. <?php echo htmlspecialchars($doctor['name'] ?? 'N/A'); ?></h2>
+                            <p class="text-secondary text-xs"><?php echo htmlspecialchars($doctor['doctor_position'] ?? 'N/A'); ?></p>
+                            <button onclick="openEditProfileModal()" class="mt-1 bg-gradient-to-r from-primary-500 to-accent-300 text-white px-2 py-0.5 rounded-lg text-xs hover:scale-105 transition-all duration-200">
+                                <i class="fas fa-edit mr-1"></i> Edit Profile
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="space-y-3">
                         <div class="flex items-center">
                             <i class="fas fa-envelope text-primary-500 mr-2"></i>
@@ -343,12 +513,39 @@ $serverPHTTime = date('H:i:s');
                                 <p class="text-neutral-dark text-xs"><?php echo htmlspecialchars($doctor['gender']); ?></p>
                             </div>
                         </div>
+                        <?php if ($assistant): ?>
+                        <div class="mt-4 pt-4 border-t border-primary-100">
+                            <h3 class="text-sm font-medium text-neutral-dark mb-2">Assistant</h3>
+                            <div class="flex items-center space-x-3">
+                                <img src="<?php echo htmlspecialchars($assistant['photo']); ?>" 
+                                     alt="Assistant Photo" 
+                                     class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">
+                                <div>
+                                    <p class="text-sm font-medium text-neutral-dark"><?php echo htmlspecialchars($assistant['name']); ?></p>
+                                    <p class="text-xs text-secondary"><?php echo htmlspecialchars($assistant['contact']); ?></p>
+                                    <p class="text-xs text-secondary"><?php echo htmlspecialchars($assistant['gmail'] ?? 'N/A'); ?></p>
+                                </div>
+                            </div>
+                        </div>
+                        <?php else: ?>
+                        <!-- Debug information display -->
+                        <div class="mt-4 pt-4 border-t border-primary-100">
+                            <h3 class="text-sm font-medium text-neutral-dark mb-2">Debug Info</h3>
+                            <div class="text-xs text-secondary">
+                                <p>Doctor ID: <?php echo htmlspecialchars($_SESSION['staff_id']); ?></p>
+                                <p>Assistant ID: <?php echo htmlspecialchars($doctor['assistant_id'] ?? 'Not set'); ?></p>
+                                <?php if ($doctorRecord): ?>
+                                    <p>Doctor Record Assistant ID: <?php echo htmlspecialchars($doctorRecord['assistant_id'] ?? 'Not set'); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
 
             <!-- Statistics Card -->
-            <div class="md:col-span-3">
+            <div id="statistics" class="md:col-span-3">
                 <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 w-full">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                         <h2 class="text-base font-medium text-neutral-dark">Doctor Statistics</h2>
@@ -413,7 +610,7 @@ $serverPHTTime = date('H:i:s');
             </div>
 
             <!-- Today's Appointments -->
-            <div class="md:col-span-4 mt-6 pt-8 md:pt-0">
+            <div id="appointments" class="md:col-span-4 mt-6 pt-8 md:pt-0">
                 <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 w-full">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                         <h2 class="text-base font-medium text-neutral-dark mb-4 sm:mb-0">Today's Appointments</h2>
@@ -596,19 +793,19 @@ $serverPHTTime = date('H:i:s');
                     </div>
 
                     <!-- Pagination Controls -->
-                    <div class="flex justify-between items-center mt-4 px-4">
-                        <div class="text-sm text-secondary">
+                        <div class="flex justify-between items-center mt-4 px-4">
+                            <div class="text-sm text-secondary">
                             Showing <span id="todayCurrentPageStart">1</span> to <span id="todayCurrentPageEnd">5</span> of <span id="todayTotalAppointments"><?php echo count($todayAppointments); ?></span> appointments
-                        </div>
-                        <div class="flex space-x-2">
+                            </div>
+                            <div class="flex space-x-2">
                             <button id="todayPrevPage" class="px-3 py-1 border border-primary-100 rounded-lg text-sm text-primary-500 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Previous
-                            </button>
+                                    Previous
+                                </button>
                             <button id="todayNextPage" class="px-3 py-1 border border-primary-100 rounded-lg text-sm text-primary-500 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                                Next
-                            </button>
+                                    Next
+                                </button>
+                            </div>
                         </div>
-                    </div>
                 </div>
             </div>
 
@@ -716,7 +913,7 @@ $serverPHTTime = date('H:i:s');
                                 <?php endif; ?>
                             </tbody>
                         </table>
-                    </div>
+                            </div>
 
                     <!-- Mobile View: Cards -->
                     <div class="sm:hidden space-y-4">
@@ -765,7 +962,7 @@ $serverPHTTime = date('H:i:s');
                                             </div>
                         <?php endforeach; ?>
                         <?php endif; ?>
-                    </div>
+</div>
 
                     <!-- Pagination for Upcoming Appointments -->
                     <div class="flex justify-between items-center mt-4 px-4">
@@ -806,6 +1003,61 @@ $serverPHTTime = date('H:i:s');
                     <i class="fas fa-print mr-2"></i>Print Receipt
                 </button>
         </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div id="paymentModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-6 border w-full max-w-md md:w-[90%] shadow-lg rounded-xl bg-white border-primary-100">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-neutral-dark">Record Payment</h3>
+            <button onclick="closePaymentModal()" class="text-neutral-dark hover:text-primary-500 transition-colors duration-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="paymentForm" method="POST" class="mt-4 space-y-4">
+            <input type="hidden" name="action" value="record_payment">
+            <input type="hidden" name="appointment_id" id="paymentAppointmentId">
+            
+            <div>
+                <label class="block text-sm font-medium text-neutral-dark">Patient</label>
+                <p id="paymentPatientName" class="mt-1 text-neutral-dark text-sm py-2 px-3"></p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-neutral-dark">Service</label>
+                <p id="paymentServiceName" class="mt-1 text-neutral-dark text-sm py-2 px-3"></p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-neutral-dark">Amount</label>
+                <input type="number" name="amount" id="paymentAmount" step="0.01" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-neutral-dark">Payment Method</label>
+                <select name="payment_method" id="paymentMethod" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
+                    <option value="">Select Method</option>
+                    <option value="Cash">Cash</option>
+                    <option value="GCash">GCash</option>
+                </select>
+            </div>
+
+            <!-- QR Code Container (initially hidden) -->
+            <div id="qrCodeContainer" class="mb-4 text-center hidden">
+                <label class="block text-sm font-medium text-neutral-dark mb-2">Scan to Pay (GCash)</label>
+                <img src="<?php echo htmlspecialchars($clinic['qrcode'] ?? ''); ?>" alt="GCash QR Code" class="mx-auto rounded-lg shadow-sm max-w-xs">
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closePaymentModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-black rounded-lg hover:scale-105 transition-all duration-200">
+                    <i class="fas fa-check mr-1.5"></i>Record Payment
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -1818,6 +2070,328 @@ $serverPHTTime = date('H:i:s');
             nextButton.disabled = currentPage >= Math.ceil(filteredAppointments.length / appointmentsPerPage);
         }
     });
+
+    // Settings Modal Functions
+    function openSettingsModal() {
+        document.getElementById('settingsModal').classList.remove('hidden');
+        document.getElementById('doctorMenu').classList.add('hidden');
+    }
+
+    function closeSettingsModal() {
+        document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    // Handle password change form submission
+    document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const newPassword = formData.get('new_password');
+        const confirmPassword = formData.get('confirm_password');
+        
+        if (newPassword !== confirmPassword) {
+            alert('New password and confirm password do not match!');
+            return;
+        }
+        
+        // Disable submit button
+        const submitButton = this.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        
+        $.ajax({
+            url: 'update_password.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                try {
+                    const result = JSON.parse(response);
+                    if (result.success) {
+                        alert('Password updated successfully!');
+                        closeSettingsModal();
+                    } else {
+                        alert(result.message || 'Error updating password. Please try again.');
+                    }
+                } catch (e) {
+                    alert('Error processing response. Please try again.');
+                }
+            },
+            error: function() {
+                alert('Error updating password. Please try again.');
+            },
+            complete: function() {
+                submitButton.disabled = false;
+            }
+        });
+    });
+
+    // Doctor Menu Dropdown Toggle
+    document.getElementById('doctorMenuTrigger').addEventListener('click', function(event) {
+        event.stopPropagation();
+        document.getElementById('doctorMenu').classList.toggle('hidden');
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('doctorMenu');
+        const trigger = document.getElementById('doctorMenuTrigger');
+        if (!menu.contains(event.target) && !trigger.contains(event.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+
+    // Smooth scroll to sections
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+            
+            if (targetElement) {
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // Add active state to navigation links
+    function updateActiveNavLink() {
+        const sections = document.querySelectorAll('div[id]');
+        const desktopLinks = document.querySelectorAll('.nav-link');
+        const mobileLinks = document.querySelectorAll('.mobile-nav-link');
+        
+        sections.forEach(section => {
+            const rect = section.getBoundingClientRect();
+            if (rect.top <= 100 && rect.bottom >= 100) {
+                // Update desktop navigation
+                desktopLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + section.id) {
+                        link.classList.add('active');
+                    }
+                });
+                
+                // Update mobile navigation
+                mobileLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + section.id) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+    }
+
+    // Add smooth scroll for both desktop and mobile navigation
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+            
+            if (targetElement) {
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    window.addEventListener('scroll', updateActiveNavLink);
+    window.addEventListener('load', updateActiveNavLink);
 </script>
+
+<!-- Add this before the closing </body> tag -->
+<!-- Settings Modal -->
+<div id="settingsModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-6 border w-full max-w-4xl shadow-lg rounded-xl bg-white border-primary-100">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-medium text-neutral-dark">Settings</h3>
+            <button onclick="closeSettingsModal()" class="text-neutral-dark hover:text-primary-500 transition-colors duration-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Profile Information -->
+            <div class="space-y-4">
+                <h4 class="text-lg font-medium text-neutral-dark mb-4">Profile Information</h4>
+                <div class="flex items-center space-x-4">
+                    <img src="<?php echo htmlspecialchars($doctor['photo']); ?>" 
+                         alt="Doctor Photo" 
+                         class="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md">
+                    <div>
+                        <h5 class="text-base font-medium text-neutral-dark">Dr. <?php echo htmlspecialchars($doctor['name']); ?></h5>
+                        <p class="text-sm text-secondary"><?php echo htmlspecialchars($doctor['doctor_position']); ?></p>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <i class="fas fa-envelope text-primary-500 mr-2"></i>
+                        <div>
+                            <label class="block text-xs font-medium text-secondary">Email</label>
+                            <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($doctor['email']); ?></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-phone text-primary-500 mr-2"></i>
+                        <div>
+                            <label class="block text-xs font-medium text-secondary">Phone</label>
+                            <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($doctor['phone']); ?></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-map-marker-alt text-primary-500 mr-2"></i>
+                        <div>
+                            <label class="block text-xs font-medium text-secondary">Address</label>
+                            <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($doctor['address']); ?></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-venus-mars text-primary-500 mr-2"></i>
+                        <div>
+                            <label class="block text-xs font-medium text-secondary">Gender</label>
+                            <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($doctor['gender']); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <?php if ($assistant): ?>
+                <div class="mt-4 pt-4 border-t border-primary-100">
+                    <h4 class="text-lg font-medium text-neutral-dark mb-4">Assistant Information</h4>
+                    <div class="flex items-center space-x-4">
+                        <img src="<?php echo htmlspecialchars($assistant['photo']); ?>" 
+                             alt="Assistant Photo" 
+                             class="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm">
+                        <div>
+                            <h5 class="text-base font-medium text-neutral-dark"><?php echo htmlspecialchars($assistant['name']); ?></h5>
+                            <p class="text-sm text-secondary">Assistant</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3 mt-3">
+                        <div class="flex items-center">
+                            <i class="fas fa-phone text-primary-500 mr-2"></i>
+                            <div>
+                                <label class="block text-xs font-medium text-secondary">Phone</label>
+                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($assistant['contact']); ?></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope text-primary-500 mr-2"></i>
+                            <div>
+                                <label class="block text-xs font-medium text-secondary">Email</label>
+                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($assistant['gmail'] ?? 'N/A'); ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Change Password -->
+            <div class="space-y-4">
+                <h4 class="text-lg font-medium text-neutral-dark mb-4">Change Password</h4>
+                <form id="changePasswordForm" class="space-y-4">
+                    <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($user['id']); ?>">
+                    <div>
+                        <label class="block text-sm font-medium text-secondary mb-1">Username</label>
+                        <input type="text" value="<?php echo htmlspecialchars($user['username']); ?>" 
+                               class="w-full px-3 py-2 rounded-lg border border-primary-100 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm" 
+                               disabled>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-secondary mb-1">Current Password</label>
+                        <input type="password" name="current_password" required
+                               class="w-full px-3 py-2 rounded-lg border border-primary-100 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-secondary mb-1">New Password</label>
+                        <input type="password" name="new_password" required
+                               class="w-full px-3 py-2 rounded-lg border border-primary-100 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-secondary mb-1">Confirm New Password</label>
+                        <input type="password" name="confirm_password" required
+                               class="w-full px-3 py-2 rounded-lg border border-primary-100 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm">
+                    </div>
+                    <button type="submit" 
+                            class="w-full bg-gradient-to-r from-primary-500 to-accent-300 text-white px-4 py-2 rounded-lg text-sm hover:scale-105 transition-all duration-200">
+                        Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this before the closing </body> tag -->
+<!-- Mobile Footer Navigation -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-primary-100 shadow-lg z-50">
+    <div class="flex justify-around items-center h-16">
+        <a href="#statistics" class="flex flex-col items-center justify-center w-full h-full text-neutral-dark hover:text-primary-500 transition-colors duration-200 relative group">
+            <i class="fas fa-chart-line text-lg"></i>
+            <span class="text-xs mt-1">Statistics</span>
+            <span class="absolute top-0 left-0 w-full h-0.5 bg-primary-500 transform scale-x-0 transition-transform duration-300 group-hover:scale-x-100"></span>
+        </a>
+        <a href="#appointments" class="flex flex-col items-center justify-center w-full h-full text-neutral-dark hover:text-primary-500 transition-colors duration-200 relative group">
+            <i class="fas fa-calendar-check text-lg"></i>
+            <span class="text-xs mt-1">Appointments</span>
+            <span class="absolute top-0 left-0 w-full h-0.5 bg-primary-500 transform scale-x-0 transition-transform duration-300 group-hover:scale-x-100"></span>
+        </a>
+    </div>
+</nav>
+
+<!-- Add padding to main content to account for mobile footer -->
+<style>
+    @media (max-width: 768px) {
+        main {
+            padding-bottom: 5rem;
+        }
+    }
+    
+    /* Active state for navigation links */
+    .nav-link.active {
+        color: #14b8a6;
+    }
+    .nav-link.active span {
+        width: 100%;
+    }
+    
+    /* Mobile footer active state */
+    .mobile-nav-link.active {
+        color: #14b8a6;
+    }
+    .mobile-nav-link.active span {
+        transform: scaleX(1);
+    }
+</style>
+
+<style>
+    /* Add these styles to your existing styles */
+    @media (max-width: 640px) {
+        .container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        /* Adjust header spacing for mobile */
+        header .container {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+        
+        /* Ensure doctor name doesn't overflow */
+        #doctorMenuTrigger {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+</style>
 </body>
 </html>
