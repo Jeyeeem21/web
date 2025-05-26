@@ -1,4 +1,7 @@
 <?php
+// Enable error logging
+ini_set('display_errors', 0);
+
 // Set timezone to Philippine Standard Time (PHT, UTC+8)
 date_default_timezone_set('Asia/Manila');
 
@@ -170,7 +173,7 @@ if (isset($_GET['action'])) {
                         'doctor_id' => $appointment['doctor_id'],
                         'appointment_date' => $appointment['appointment_date'],
                         'appointment_time' => date('h:00 A', strtotime($appointment['appointment_time'])),
-                        'remarks' => $appointment['remarks']
+                        'remarks' => $appointment['remarks'] ?? ''
                     ]
                 ]);
                 exit();
@@ -245,165 +248,157 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
         
         // Validate inputs
         if (empty($patient_id) || empty($staff_id) || empty($service_id) || empty($appointment_date) || empty($appointment_time)) {
-            $error = "All fields are required.";
-        } else {
-            try {
-                // Strict date validation
-                $today = date('Y-m-d');
-                $selectedDate = date('Y-m-d', strtotime($appointment_date));
-                
-                if ($selectedDate < $today) {
-                    throw new Exception("Cannot book appointments for past dates. Please select today or a future date.");
-                }
-                
-                // If rescheduling, update existing appointment
-                if ($appointment_id) {
-                    // First check if the appointment exists
-                    $checkStmt = $pdo->prepare("SELECT id FROM appointments WHERE id = :id");
-                    $checkStmt->execute([':id' => $appointment_id]);
-                    $exists = $checkStmt->fetch();
-                    
-                    if ($exists) {
-                        // Update the existing appointment
-                        $sql = "UPDATE appointments SET 
-                                patient_id = :patient_id,
-                                staff_id = :staff_id,
-                                service_id = :service_id,
-                                appointment_date = :appointment_date,
-                                appointment_time = :appointment_time,
-                                remarks = :remarks,
-                                status = :status,
-                                updated_at = NOW()
-                                WHERE id = :id";
-                        $stmt = $pdo->prepare($sql);
-                        $stmt->execute([
-                            ':patient_id' => $patient_id,
-                            ':staff_id' => $staff_id,
-                            ':service_id' => $service_id,
-                            ':appointment_date' => $appointment_date,
-                            ':appointment_time' => sprintf('%02d:00:00', intval(date('H', strtotime($appointment_time)))),
-                            ':remarks' => $remarks,
-                            ':status' => $status,
-                            ':id' => $appointment_id
-                        ]);
-                        
-                        $success = "Appointment rescheduled successfully!";
-                    } else {
-                        throw new Exception("Appointment not found.");
-                    }
-                } else {
-                    // Check if patient status is active
-                    $stmt = $pdo->prepare("SELECT status FROM patients WHERE id = :id");
-                    $stmt->execute([':id' => $patient_id]);
-                    $patientStatus = $stmt->fetchColumn();
-                    
-                    if ($patientStatus != 1) {
-                        $error = "Selected patient is not active. Only active patients can be scheduled.";
-                    } else {
-                        // Check if date is in the past
-                        if (strtotime($appointment_date) < strtotime(date('Y-m-d'))) {
-                            $error = "Cannot book appointments for past dates.";
-                        } else {
-                            // Get day of week for the selected date
-                            $dayOfWeek = date('l', strtotime($appointment_date));
-                            
-                            // Check if it's doctor's rest day
-                            $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day = :rest_day");
-                            $stmt->execute([':doctor_id' => $staff_id, ':rest_day' => $dayOfWeek]);
-                            $restDay = $stmt->fetch();
-                            
-                            if ($restDay) {
-                                $error = "Doctor is not available on " . $dayOfWeek;
-                            } else {
-                                // Get clinic hours for the day
-                                $clinicHours = '';
-                                if ($dayOfWeek == 'Sunday') {
-                                    $clinicHours = $clinic['hours_sunday'];
-                                } else if ($dayOfWeek == 'Saturday') {
-                                    $clinicHours = $clinic['hours_saturday'];
-                                } else {
-                                    $clinicHours = $clinic['hours_weekdays'];
-                                }
-                                
-                                // Check if clinic is closed
-                                if ($clinicHours == 'Closed') {
-                                    $error = "Clinic is closed on " . $dayOfWeek;
-                                } else {
-                                    // Parse clinic hours
-                                    $hours = explode(' - ', $clinicHours);
-                                    $startTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[0]))));
-                                    $endTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[1]))));
-                                    
-                                    // Get doctor's schedule
-                                    $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day != :rest_day");
-                                    $stmt->execute([':doctor_id' => $staff_id, ':rest_day' => $dayOfWeek]);
-                                    $doctorSchedule = $stmt->fetch();
-                                    
-                                    if ($doctorSchedule) {
-                                        $startTime = $doctorSchedule['start_time'];
-                                        $endTime = $doctorSchedule['end_time'];
-                                    }
-                                    
-                                    // Extract hour from appointment time (e.g., "9:00 AM" -> 9)
-                                    $appointmentHour = intval(date('H', strtotime($appointment_time)));
-                                    
-                                    // Check if appointment time is within clinic hours
-                                    $startHour = intval(date('H', strtotime($startTime)));
-                                    $endHour = intval(date('H', strtotime($endTime)));
-                                    
-                                    if ($appointmentHour < $startHour || $appointmentHour >= $endHour) {
-                                        $error = "Appointment time is outside clinic hours.";
-                                    } else {
-                                        // Check if slot is already booked - using hour
-                                        $stmt = $pdo->prepare("SELECT COUNT(*) FROM appointments 
-                                                              WHERE staff_id = :staff_id AND appointment_date = :date 
-                                                              AND HOUR(appointment_time) = :hour 
-                                                              AND status != 'Cancelled'");
-                                        $stmt->execute([
-                                            ':staff_id' => $staff_id, 
-                                            ':date' => $appointment_date, 
-                                            ':hour' => $appointmentHour
-                                        ]);
-                                        $count = $stmt->fetchColumn();
-                                        
-                                        if ($count > 0) {
-                                            $error = "This time slot is already booked.";
-                                        } else {
-                                            // Create time in database format (HH:00:00)
-                                            $dbTime = sprintf('%02d:00:00', $appointmentHour);
-                                            
-                                            // Insert appointment
-                                            $sql = "INSERT INTO appointments (patient_id, staff_id, service_id, appointment_date, 
-                                                    appointment_time, status, remarks, created_at) 
-                                                    VALUES (:patient_id, :staff_id, :service_id, :appointment_date, 
-                                                    :appointment_time, :status, :remarks, NOW())";
-                                            $stmt = $pdo->prepare($sql);
-                                            $stmt->execute([
-                                                ':patient_id' => $patient_id,
-                                                ':staff_id' => $staff_id,
-                                                ':service_id' => $service_id,
-                                                ':appointment_date' => $appointment_date,
-                                                ':appointment_time' => $dbTime,
-                                                ':status' => $status,
-                                                ':remarks' => $remarks
-                                            ]);
-                                            
-                                            $success = "Appointment scheduled successfully!";
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Redirect to prevent form resubmission
-                header("Location: index.php?page=schedule&success=appointment_added&date=" . $appointment_date);
-                exit();
-            } catch (PDOException $e) {
-                $error = "Error scheduling appointment: " . $e->getMessage();
-                error_log("Appointment Error: " . $e->getMessage());
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'All fields are required.']);
+            exit();
+        }
+
+        try {
+            // Strict date validation
+            $today = date('Y-m-d');
+            $selectedDate = date('Y-m-d', strtotime($appointment_date));
+            
+            if ($selectedDate < $today) {
+                throw new Exception("Cannot book appointments for past dates. Please select today or a future date.");
             }
+
+            // Check if patient status is active
+            $stmt = $pdo->prepare("SELECT status FROM patients WHERE id = :id");
+            $stmt->execute([':id' => $patient_id]);
+            $patientStatus = $stmt->fetchColumn();
+            
+            if ($patientStatus != 1) {
+                throw new Exception("Selected patient is not active. Only active patients can be scheduled.");
+            }
+
+            // Get day of week for the selected date
+            $dayOfWeek = date('l', strtotime($appointment_date));
+            
+            // Check if it's doctor's rest day
+            $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day = :rest_day");
+            $stmt->execute([':doctor_id' => $staff_id, ':rest_day' => $dayOfWeek]);
+            $restDay = $stmt->fetch();
+            
+            if ($restDay) {
+                throw new Exception("Doctor is not available on " . $dayOfWeek);
+            }
+
+            // Get clinic hours for the day
+            $clinicHours = '';
+            if ($dayOfWeek == 'Sunday') {
+                $clinicHours = $clinic['hours_sunday'] ?? 'Closed';
+            } else if ($dayOfWeek == 'Saturday') {
+                $clinicHours = $clinic['hours_saturday'] ?? 'Closed';
+            } else {
+                $clinicHours = $clinic['hours_weekdays'] ?? 'Closed';
+            }
+
+            if ($clinicHours == 'Closed') {
+                throw new Exception("Clinic is closed on " . $dayOfWeek);
+            }
+
+            // Parse clinic hours
+            $hours = explode(' - ', $clinicHours);
+            $startTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[0]))));
+            $endTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[1]))));
+            
+            // Get doctor's schedule
+            $stmt = $pdo->prepare("SELECT * FROM doctor_schedule WHERE doctor_id = :doctor_id AND rest_day != :rest_day");
+            $stmt->execute([':doctor_id' => $staff_id, ':rest_day' => $dayOfWeek]);
+            $doctorSchedule = $stmt->fetch();
+            
+            if ($doctorSchedule) {
+                $startTime = $doctorSchedule['start_time'];
+                $endTime = $doctorSchedule['end_time'];
+            }
+            
+            // Extract hour from appointment time (e.g., "9:00 AM" -> 9)
+            $appointmentHour = intval(date('H', strtotime($appointment_time)));
+            
+            // Check if appointment time is within clinic hours
+            $startHour = intval(date('H', strtotime($startTime)));
+            $endHour = intval(date('H', strtotime($endTime)));
+            
+            if ($appointmentHour < $startHour || $appointmentHour >= $endHour) {
+                throw new Exception("Appointment time is outside clinic hours.");
+            }
+
+            // Check if slot is already booked (excluding the current appointment if rescheduling)
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM appointments 
+                                  WHERE staff_id = :staff_id 
+                                  AND appointment_date = :date 
+                                  AND HOUR(appointment_time) = :hour 
+                                  AND status != 'Cancelled'
+                                  AND id != :appointment_id");
+            $stmt->execute([
+                ':staff_id' => $staff_id, 
+                ':date' => $appointment_date, 
+                ':hour' => $appointmentHour,
+                ':appointment_id' => $appointment_id ?? 0
+            ]);
+            $count = $stmt->fetchColumn();
+            
+            if ($count > 0) {
+                throw new Exception("This time slot is already booked.");
+            }
+
+            // Create time in database format (HH:00:00)
+            $dbTime = sprintf('%02d:00:00', $appointmentHour);
+            
+            if ($appointment_id) {
+                // Update existing appointment
+                $sql = "UPDATE appointments SET 
+                        patient_id = :patient_id,
+                        staff_id = :staff_id,
+                        service_id = :service_id,
+                        appointment_date = :appointment_date,
+                        appointment_time = :appointment_time,
+                        status = :status,
+                        remarks = :remarks,
+                        updated_at = NOW()
+                        WHERE id = :appointment_id";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':patient_id' => $patient_id,
+                    ':staff_id' => $staff_id,
+                    ':service_id' => $service_id,
+                    ':appointment_date' => $appointment_date,
+                    ':appointment_time' => $dbTime,
+                    ':status' => $status,
+                    ':remarks' => $remarks,
+                    ':appointment_id' => $appointment_id
+                ]);
+                $message = 'Appointment rescheduled successfully!';
+            } else {
+                // Insert new appointment
+                $sql = "INSERT INTO appointments (patient_id, staff_id, service_id, appointment_date, 
+                        appointment_time, status, remarks, created_at) 
+                        VALUES (:patient_id, :staff_id, :service_id, :appointment_date, 
+                        :appointment_time, :status, :remarks, NOW())";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':patient_id' => $patient_id,
+                    ':staff_id' => $staff_id,
+                    ':service_id' => $service_id,
+                    ':appointment_date' => $appointment_date,
+                    ':appointment_time' => $dbTime,
+                    ':status' => $status,
+                    ':remarks' => $remarks
+                ]);
+                $message = 'Appointment scheduled successfully!';
+            }
+            
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'message' => $message]);
+            exit();
+
+        } catch (Exception $e) {
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit();
         }
     }
     
@@ -415,14 +410,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
             // Update appointment status
             $sql = "UPDATE appointments SET status = :status, updated_at = NOW() WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([':id' => $id, ':status' => $status]);
+            $result = $stmt->execute([':id' => $id, ':status' => $status]);
             
-            $success = "Appointment status updated successfully!";
-            // Redirect to prevent form resubmission
-            header("Location: index.php?page=schedule&success=status_updated&date=" . $selectedDate);
-            exit();
+            if ($result) {
+                ob_clean();
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'message' => 'Appointment status updated successfully!']);
+                exit();
+            } else {
+                throw new Exception("Failed to update appointment status");
+            }
         } catch (PDOException $e) {
-            $error = "Error updating appointment status: " . $e->getMessage();
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+            exit();
+        } catch (Exception $e) {
+            ob_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit();
         }
     }
 
@@ -567,24 +574,113 @@ try {
 } catch (PDOException $e) {
     $error = "Error fetching appointment counts: " . $e->getMessage();
 }
+
+// Previous and next month links
+$prevMonth = $month - 1;
+$prevYear = $year;
+if ($prevMonth < 1) {
+    $prevMonth = 12;
+    $prevYear--;
+}
+
+$nextMonth = $month + 1;
+$nextYear = $year;
+if ($nextMonth > 12) {
+    $nextMonth = 1;
+    $nextYear++;
+}
+
+// At the top of the PHP file, add this to handle pagination AJAX request
+if (isset($_GET['action']) && $_GET['action'] == 'get_paginated_appointments') {
+    $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $perPage = 5; // Items per page
+    $offset = ($page - 1) * $perPage;
+    $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+    
+    try {
+        // Base query
+        $baseQuery = "FROM appointments a
+                     JOIN patients p ON a.patient_id = p.id
+                     JOIN services s ON a.service_id = s.id
+                     JOIN staff st ON a.staff_id = st.id
+                     JOIN doctor_position dp ON st.doctor_position_id = dp.id
+                     WHERE a.appointment_date = :date";
+        
+        // Add search condition if search query exists
+        if (!empty($search)) {
+            $baseQuery .= " AND (
+                p.name LIKE :search 
+                OR s.service_name LIKE :search 
+                OR st.name LIKE :search 
+                OR a.status LIKE :search
+            )";
+        }
+        
+        // Count total appointments for pagination
+        $countStmt = $pdo->prepare("SELECT COUNT(*) " . $baseQuery);
+        $countParams = [':date' => $selectedDate];
+        if (!empty($search)) {
+            $countParams[':search'] = "%$search%";
+        }
+        $countStmt->execute($countParams);
+        $totalAppointments = $countStmt->fetchColumn();
+        $totalPages = ceil($totalAppointments / $perPage);
+        
+        // Get paginated appointments
+        $stmt = $pdo->prepare("SELECT a.*, 
+                             p.id as patient_id, 
+                             p.name as patient_name,
+                             s.id as service_id, 
+                             s.service_name,
+                             s.time as service_duration,
+                             st.id as doctor_id,
+                             st.name as doctor_name,
+                             dp.doctor_position
+                             " . $baseQuery . "
+                             ORDER BY 
+                                CASE a.status
+                                    WHEN 'Scheduled' THEN 1
+                                    WHEN 'Re-scheduled' THEN 1
+                                    WHEN 'Completed' THEN 2
+                                    WHEN 'Cancelled' THEN 3
+                                    ELSE 4
+                                END,
+                                a.appointment_time ASC
+                             LIMIT :offset, :perPage");
+        
+        $stmt->bindValue(':date', $selectedDate, PDO::PARAM_STR);
+        if (!empty($search)) {
+            $stmt->bindValue(':search', "%$search%", PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->bindValue(':perPage', $perPage, PDO::PARAM_INT);
+        $stmt->execute();
+        $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'appointments' => $appointments,
+            'totalPages' => $totalPages,
+            'currentPage' => $page
+        ]);
+        exit();
+    } catch (PDOException $e) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Error fetching appointments: ' . $e->getMessage()]);
+        exit();
+    }
+}
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Appointment Schedule</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-</head>
-<body class="bg-neutral-light font-body">
-<div id="schedule" class="space-y-8 p-6 md:p-8 animate-fade-in bg-white">
-    <h2 class="text-2xl md:text-3xl font-heading font-bold text-primary-500">Appointment Schedule</h2>
+<div id="schedule" class="space-y-6">
+    <h2 class="text-2xl font-semibold text-gray-800 mb-6">Appointment Schedule</h2>
     
     <!-- Success/Error Message -->
     <?php if (isset($_GET['success']) || $error || $success): ?>
-    <div id="alert" class="bg-<?php echo $error ? 'red-100 border-red-200 text-red-800' : 'success-light border-success text-success'; ?> border px-4 py-3 rounded-xl text-sm flex justify-between items-center animate-slide-up">
+    <div id="alert" class="bg-<?php echo $error ? 'red' : 'success'; ?>-50 border border-<?php echo $error ? 'red' : 'success'; ?>-200 text-<?php echo $error ? 'red' : 'success'; ?>-800 px-3 py-2 rounded-md text-sm flex justify-between items-center">
         <span>
             <?php 
             if ($error) {
@@ -598,7 +694,7 @@ try {
             }
             ?>
         </span>
-        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red-600 hover:text-red-800' : 'success hover:text-success-dark'; ?>">
+        <button type="button" onclick="document.getElementById('alert').style.display = 'none'" class="text-<?php echo $error ? 'red' : 'success'; ?>-600">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -615,52 +711,38 @@ try {
     </script>
     <?php endif; ?>
     
-    <div class="grid grid-cols-1 lg:grid-cols-7 gap-6">
-        <!-- Calendar -->
-        <div class="lg:col-span-5 bg-white rounded-xl shadow-sm border border-primary-100 p-6 animate-slide-up">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-lg font-medium text-neutral-dark"><?php echo $monthName . ' ' . $year; ?></h3>
+    <div class="space-y-6">
+        <!-- Calendar Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-6 animate-slide-up">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-neutral-dark"><?php echo $monthName . ' ' . $year; ?></h3>
                 <div class="flex space-x-2">
-                    <a href="index.php?page=schedule&month=<?php echo $prevMonth; ?>&year=<?php echo $prevYear; ?>" class="p-2 bg-primary-50 text-primary-500 rounded-lg hover:bg-primary-100 transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <a href="index.php?page=schedule&month=<?php echo $prevMonth; ?>&year=<?php echo $prevYear; ?>" class="p-2 rounded-lg hover:bg-primary-50 transition-colors duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                         </svg>
                     </a>
-                    <a href="index.php?page=schedule&month=<?php echo $nextMonth; ?>&year=<?php echo $nextYear; ?>" class="p-2 bg-primary-50 text-primary-500 rounded-lg hover:bg-primary-100 transition-all duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <a href="index.php?page=schedule&month=<?php echo $nextMonth; ?>&year=<?php echo $nextYear; ?>" class="p-2 rounded-lg hover:bg-primary-50 transition-colors duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </a>
                 </div>
             </div>
-            <div class="grid grid-cols-7 gap-2 text-center mb-4">
-                <div class="text-xs font-medium text-primary-500 uppercase">Sun</div>
-                <div class="text-xs font-medium text-primary-500 uppercase">Mon</div>
-                <div class="text-xs font-medium text-primary-500 uppercase">Tue</div>
-                <div class="text-xs font-medium text-primary-500 uppercase">Wed</div>
-                <div class="text-xs font-medium text-primary-500 uppercase">Thu</div>
-                <div class="text-xs font-medium text-primary-500 uppercase">Fri</div>
-                <div class="text-xs font-medium text-primary-500 uppercase">Sat</div>
+            <div class="grid grid-cols-7 gap-2 text-center mb-2">
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Sun</div>
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Mon</div>
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Tue</div>
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Wed</div>
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Thu</div>
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Fri</div>
+                <div class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Sat</div>
             </div>
             <div class="grid grid-cols-7 gap-2">
                 <?php
-                // Previous and next month links
-                $prevMonth = $month - 1;
-                $prevYear = $year;
-                if ($prevMonth < 1) {
-                    $prevMonth = 12;
-                    $prevYear--;
-                }
-
-                $nextMonth = $month + 1;
-                $nextYear = $year;
-                if ($nextMonth > 12) {
-                    $nextMonth = 1;
-                    $nextYear++;
-                }
                 // Add blank cells for days before the first day of the month
                 for ($i = 0; $i < $dayOfWeek; $i++) {
-                    echo '<div class="relative h-16 p-1 border border-primary-100 rounded-md text-secondary bg-neutral-light"></div>';
+                    echo '<div class="relative h-16 p-1 border rounded-lg text-gray-400"></div>';
                 }
                 
                 // Add cells for each day of the month
@@ -685,16 +767,16 @@ try {
                     $todayClass = $isToday ? 'bg-primary-100 font-bold border-2 border-primary-500' : '';
                     
                     // Apply selectedClass if it is the selected date, but NOT today
-                    $selectedClass = ($isSelected && !$isToday) ? 'border-2 border-primary-500' : '';
+                    $selectedClass = ($isSelected && !$isToday) ? 'border-primary-500 border-2' : '';
                     
-                    $pastClass = $isPast ? 'bg-neutral-light text-secondary' : '';
+                    $pastClass = $isPast ? 'bg-gray-100 text-gray-500' : '';
                     
-                    echo '<div class="relative h-16 p-1 border border-primary-100 rounded-md ' . $appointmentClass . ' ' . $todayClass . ' ' . $selectedClass . ' ' . $pastClass . ' hover:bg-primary-50 transition-all duration-200">
-                        <a href="index.php?page=schedule&date=' . $date . '" class="block h-full w-full">
-                            <div class="text-sm text-neutral-dark">' . $day . '</div>';
+                    echo '<div class="relative h-16 p-1 border rounded-lg ' . $appointmentClass . ' ' . $todayClass . ' ' . $selectedClass . ' ' . $pastClass . '">
+                        <a href="index.php?page=schedule&date=' . $date . '&month=' . $month . '&year=' . $year . '" class="block h-full w-full">
+                            <div class="text-sm">' . $day . '</div>';
                     
                     if ($appointmentCount > 0) {
-                        echo '<div class="text-xs text-primary-500 font-medium">' . $appointmentCount . ' appt</div>';
+                        echo '<div class="text-xs text-primary-600 font-medium">' . $appointmentCount . ' appt</div>';
                     }
                     
                     if ($appointmentCount > 0) {
@@ -710,89 +792,46 @@ try {
                 if ($remainingCells > 7) $remainingCells -= 7; // Don't show an extra row if not needed
                 
                 for ($i = 0; $i < $remainingCells; $i++) {
-                    echo '<div class="relative h-16 p-1 border border-primary-100 rounded-md text-secondary bg-neutral-light"></div>';
+                    echo '<div class="relative h-16 p-1 border rounded-lg text-gray-400"></div>';
                 }
                 ?>
             </div>
         </div>
-        <!-- Appointments List -->
-        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-primary-100 p-6 animate-slide-up">
-            <h3 class="text-lg font-medium text-neutral-dark mb-6">
-                <?php echo date('F j, Y', strtotime($selectedDate)); ?> Appointments
-            </h3>
-            <div class="space-y-4">
-                <?php if (count($appointments) > 0): ?>
-                    <?php foreach ($appointments as $appointment): ?>
-                        <?php
-                        $statusClass = '';
-                        $statusTextClass = '';
-                        
-                        switch ($appointment['status']) {
-                            case 'Scheduled':
-                                $statusClass = 'bg-primary-50 border-primary-100';
-                                $statusTextClass = 'text-primary-500';
-                                break;
-                            case 'Completed':
-                                $statusClass = 'bg-success-light border-success';
-                                $statusTextClass = 'text-success';
-                                break;
-                            case 'Cancelled':
-                                $statusClass = 'bg-red-100 border-red-200';
-                                $statusTextClass = 'text-red-600';
-                                break;
-                            case 'Re-scheduled':
-                                $statusClass = 'bg-yellow-50 border-yellow-100';
-                                $statusTextClass = 'text-yellow-600';
-                                break;
-                            default:
-                                $statusClass = 'bg-primary-50 border-primary-100';
-                                $statusTextClass = 'text-primary-500';
-                        }
-                        ?>
-                        <div class="p-4 <?php echo $statusClass; ?> rounded-lg border shadow-sm hover:bg-opacity-75 transition-all duration-200">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-sm font-medium text-neutral-dark"><?php echo htmlspecialchars($appointment['patient_name']); ?></p>
-                                    <p class="text-xs text-secondary"><?php echo htmlspecialchars($appointment['service_name']); ?></p>
-                                    <p class="text-xs text-secondary">Dr. <?php echo htmlspecialchars($appointment['doctor_name']); ?></p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-sm font-medium <?php echo $statusTextClass; ?>"><?php echo date('h:00 A', strtotime($appointment['appointment_time'])); ?></p>
-                                    <p class="text-xs text-secondary"><?php echo htmlspecialchars($appointment['service_duration']); ?></p>
-                                    <p class="text-xs <?php echo $statusTextClass; ?>"><?php echo htmlspecialchars($appointment['status']); ?></p>
-                                </div>
-                            </div>
-                            <?php if ($appointment['status'] == 'Scheduled'): ?>
-                                <div class="mt-3 flex justify-end space-x-2">
-                                    <button type="button" class="text-xs bg-success text-white px-2 py-1 rounded-lg hover:bg-success-dark transition-all duration-200" 
-                                            onclick="updateStatus(<?php echo $appointment['id']; ?>, 'Completed')">
-                                        Complete
-                                    </button>
-                                    <button type="button" class="text-xs bg-yellow-500 text-white px-2 py-1 rounded-lg hover:bg-yellow-600 transition-all duration-200" 
-                                            onclick="updateStatus(<?php echo $appointment['id']; ?>, 'Re-scheduled')">
-                                        Reschedule
-                                    </button>
-                                    <button type="button" class="text-xs bg-red-600 text-white px-2 py-1 rounded-lg hover:bg-red-700 transition-all duration-200" 
-                                            onclick="updateStatus(<?php echo $appointment['id']; ?>, 'Cancelled')">
-                                        Cancel
-                                    </button>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="p-4 bg-primary-50 rounded-lg border border-primary-100 text-center shadow-sm">
-                        <p class="text-sm text-secondary">No appointments scheduled for this date.</p>
-                    </div>
-                <?php endif; ?>
-            </div>
-            <div class="mt-6">
-                <button class="w-full bg-gradient-to-r from-primary-500 to-accent-300 text-white py-2 px-4 rounded-lg hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2" onclick="openAppointmentModal()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
+
+        <!-- Appointments Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-primary-100 p-4 animate-slide-up">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-medium text-neutral-dark">
+                    <?php echo date('F j, Y', strtotime($selectedDate)); ?> Appointments
+                </h3>
+                <button class="bg-gradient-to-r from-primary-500 to-accent-300 text-white py-1.5 px-3 rounded-lg hover:scale-105 transition-all duration-200 text-sm" onclick="openAppointmentModal()">
                     Add New Appointment
                 </button>
+            </div>
+            
+            <!-- Appointment List Container -->
+            <div id="appointmentListContainer">
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <input type="text" id="searchAppointment" placeholder="Search appointments..." 
+                               class="w-full px-4 py-2 rounded-lg border border-primary-100 focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="appointmentList" class="space-y-3">
+                    <!-- Appointments will be loaded here via AJAX -->
+                </div>
+                <div id="paginationControls" class="flex justify-center items-center space-x-2 mt-4">
+                    <button id="prevPage" class="px-3 py-1 bg-primary-50 text-primary-500 rounded-lg hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200" disabled>&lt; Previous</button>
+                    <span id="pageInfo" class="text-sm text-neutral-dark mx-2"></span>
+                    <button id="nextPage" class="px-3 py-1 bg-primary-50 text-primary-500 rounded-lg hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200" disabled>Next &gt;</button>
+                </div>
             </div>
         </div>
     </div>
@@ -804,6 +843,7 @@ try {
                 <h3 class="text-lg font-medium text-neutral-dark">Schedule New Appointment</h3>
                 <form id="appointmentForm" method="POST" class="mt-4 space-y-4">
                     <input type="hidden" name="action" value="add_appointment">
+                    <input type="hidden" name="appointment_id" id="appointmentId">
                     
                     <div>
                         <label class="block text-sm font-medium text-neutral-dark">Patient</label>
@@ -881,12 +921,12 @@ try {
                     
                     <div>
                         <label class="block text-sm font-medium text-neutral-dark">Patient</label>
-                        <p id="paymentPatientName" class="mt-1 text-neutral-dark text-sm"></p>
+                        <p id="paymentPatientName" class="mt-1 text-neutral-dark text-sm py-2 px-3"></p>
                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-neutral-dark">Service</label>
-                        <p id="paymentServiceName" class="mt-1 text-neutral-dark text-sm"></p>
+                        <p id="paymentServiceName" class="mt-1 text-neutral-dark text-sm py-2 px-3"></p>
                     </div>
 
                     <div>
@@ -911,7 +951,7 @@ try {
                     
                     <div class="flex justify-end space-x-3">
                         <button type="button" onclick="closePaymentModal()" class="px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-all duration-200">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-success to-success-dark text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Record Payment</button>
+                        <button type="submit" class="px-4 py-2 bg-gradient-to-r from-success-500 to-success-600 text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Record Payment</button>
                     </div>
                 </form>
             </div>
@@ -925,6 +965,94 @@ try {
         <input type="hidden" name="status" id="appointmentStatus">
     </form>
 </div>
+
+<style>
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f8fafc;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+    background: #ccfbf1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #99f6e4;
+}
+
+/* Smooth transitions */
+.transition-all {
+    transition: all 0.3s ease;
+}
+
+/* Doctor position specific styles */
+.doctor-position {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.doctor-position.specialist {
+    background-color: var(--info-color);
+}
+
+.doctor-position.consultant {
+    background-color: var(--warning-color);
+}
+
+.doctor-position.general {
+    background-color: var(--success-color);
+}
+
+/* Mobile card view */
+@media (max-width: 640px) {
+    .mobile-card-view thead {
+        display: none;
+    }
+    
+    .mobile-card-view tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        background: white;
+    }
+    
+    .mobile-card-view tbody td {
+        display: flex;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .mobile-card-view tbody td:last-child {
+        border-bottom: none;
+    }
+    
+    .mobile-card-view tbody td:before {
+        content: attr(data-label);
+        font-weight: 600;
+        width: 40%;
+        color: var(--secondary-color);
+    }
+    
+    .mobile-card-view tbody td > div {
+        width: 60%;
+    }
+
+    .doctor-position {
+        margin-top: 0.5rem;
+    }
+}
+</style>
 
 <script>
 // Server-provided PHT date and time
@@ -1093,12 +1221,24 @@ function updateStatus(id, status) {
                 alert('Error loading payment details. Please try again.');
             }
         });
-    } else {
+    } else if (status === 'Cancelled') {
         // Handle Cancel status
-        if (confirm(`Are you sure you want to mark this appointment as ${status}?`)) {
-            document.getElementById('appointmentId').value = id;
-            document.getElementById('appointmentStatus').value = status;
-            document.getElementById('statusForm').submit();
+        if (confirm('Are you sure you want to cancel this appointment?')) {
+            $.ajax({
+                url: 'schedule.php',
+                type: 'POST',
+                data: {
+                    action: 'update_status',
+                    id: id,
+                    status: status
+                },
+                success: function(response) {
+                    window.location.reload();
+                },
+                error: function() {
+                    alert('Error updating appointment status. Please try again.');
+                }
+            });
         }
     }
 }
@@ -1244,78 +1384,185 @@ $(document).ready(function() {
         }
     });
 });
+
+$(document).ready(function() {
+    let currentPage = 1;
+    let totalPages = 1;
+    let searchQuery = '';
+    
+    // Function to load appointments for a specific page
+    function loadAppointments(page) {
+        $.ajax({
+            url: 'schedule.php',
+            type: 'GET',
+            data: {
+                action: 'get_paginated_appointments',
+                date: selectedDatePHT,
+                page: page,
+                search: searchQuery
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    currentPage = response.currentPage;
+                    totalPages = response.totalPages;
+                    
+                    // Update pagination controls
+                    $('#pageInfo').text(`Page ${currentPage} of ${totalPages}`);
+                    $('#prevPage').prop('disabled', currentPage === 1);
+                    $('#nextPage').prop('disabled', currentPage === totalPages);
+                    
+                    // Render appointments
+                    let html = '';
+                    if (response.appointments.length > 0) {
+                        // Group appointments by status
+                        let groupedAppointments = {
+                            'Scheduled': [],
+                            'Completed': [],
+                            'Cancelled': []
+                        };
+                        
+                        response.appointments.forEach(function(appointment) {
+                            if (appointment.status === 'Re-scheduled') {
+                                groupedAppointments['Scheduled'].push(appointment);
+                            } else {
+                                groupedAppointments[appointment.status].push(appointment);
+                            }
+                        });
+                        
+                        // Display appointments in order: Scheduled, Completed, Cancelled
+                        ['Scheduled', 'Completed', 'Cancelled'].forEach(function(status) {
+                            if (groupedAppointments[status].length > 0) {
+                                html += `<div class="text-sm font-medium text-black mb-2 mt-4">${status} Appointments</div>`;
+                                
+                                groupedAppointments[status].forEach(function(appointment) {
+                                    let statusClass = '';
+                                    let statusTextClass = '';
+                                    
+                                    switch (appointment.status) {
+                                        case 'Scheduled':
+                                        case 'Re-scheduled':
+                                            statusClass = 'bg-primary-50 border-primary-100';
+                                            statusTextClass = 'text-primary-600';
+                                            break;
+                                        case 'Completed':
+                                            statusClass = 'bg-success-50 border-success-100';
+                                            statusTextClass = 'text-success-600';
+                                            break;
+                                        case 'Cancelled':
+                                            statusClass = 'bg-danger-50 border-danger-100';
+                                            statusTextClass = 'text-danger-600';
+                                            break;
+                                        default:
+                                            statusClass = 'bg-gray-50 border-gray-100';
+                                            statusTextClass = 'text-black';
+                                    }
+                                    
+                                    html += `
+                                        <div class="p-3 ${statusClass} rounded-lg border hover:bg-primary-50">
+                                            <div class="flex flex-col space-y-2">
+                                                <div class="flex justify-between items-start">
+                                                    <div class="space-y-0.5">
+                                                        <div class="flex items-center space-x-2">
+                                                            <p class="text-sm font-medium text-black">${appointment.patient_name}</p>
+                                                            <span class="text-xs px-2 py-0.5 rounded-lg ${
+                                                                appointment.status === 'Completed' ? 'bg-gradient-to-r from-success-700 to-success-800 text-black' :
+                                                                appointment.status === 'Cancelled' ? 'bg-gradient-to-r from-danger-700 to-danger-800 text-black' :
+                                                                appointment.status === 'Re-scheduled' ? 'bg-gradient-to-r from-warning-700 to-warning-800 text-black' :
+                                                                appointment.status === 'Scheduled' ? 'bg-gradient-to-r from-primary-700 to-primary-800 text-black' :
+                                                                statusTextClass
+                                                            }">${appointment.status}</span>
+                                                        </div>
+                                                        <p class="text-xs text-black">${appointment.service_name}</p>
+                                                    </div>
+                                                    <div class="text-right space-y-0.5">
+                                                        <p class="text-sm font-medium ${statusTextClass}">${new Date('1970-01-01T' + appointment.appointment_time + 'Z').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+                                                        <p class="text-xs text-neutral-dark">${appointment.service_duration}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex justify-between items-center pt-2 border-t border-gray-200">
+                                                    <div class="flex items-center space-x-2">
+                                                        <p class="text-xs text-black">Dr. ${appointment.doctor_name}</p>
+                                                        ${appointment.doctor_position ? `<span class="doctor-position ${appointment.doctor_position.toLowerCase()} text-black text-xs">${appointment.doctor_position}</span>` : ''}
+                                                    </div>
+                                                    ${appointment.status === 'Scheduled' ? `
+                                                        <div class="flex space-x-2">
+                                                            <button type="button" class="text-xs bg-gradient-to-r from-success-700 to-success-800 text-black px-2.5 py-1 rounded-lg hover:from-success-800 hover:to-success-900 transition-all duration-200 shadow-sm" 
+                                                                    onclick="updateStatus(${appointment.id}, 'Completed')">
+                                                                Complete
+                                                            </button>
+                                                            <button type="button" class="text-xs bg-gradient-to-r from-warning-700 to-warning-800 text-black px-2.5 py-1 rounded-lg hover:from-warning-800 hover:to-warning-900 transition-all duration-200 shadow-sm" 
+                                                                    onclick="updateStatus(${appointment.id}, 'Re-scheduled')">
+                                                                Reschedule
+                                                            </button>
+                                                            <button type="button" class="text-xs bg-gradient-to-r from-danger-700 to-danger-800 text-black px-2.5 py-1 rounded-lg hover:from-danger-800 hover:to-danger-900 transition-all duration-200 shadow-sm" 
+                                                                    onclick="updateStatus(${appointment.id}, 'Cancelled')">
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                            </div>
+                                        </div>`;
+                                });
+                            }
+                        });
+                    } else {
+                        html = '<div class="p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">' +
+                               '<p class="text-sm text-secondary">No appointments found.</p>' +
+                               '</div>';
+                    }
+                    
+                    $('#appointmentList').html(html);
+                } else {
+                    $('#appointmentList').html('<div class="p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">' +
+                                              '<p class="text-sm text-secondary">Error loading appointments: ' + response.message + '</p>' +
+                                              '</div>');
+                }
+            },
+            error: function() {
+                $('#appointmentList').html('<div class="p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">' +
+                                          '<p class="text-sm text-secondary">Error loading appointments. Please try again.</p>' +
+                                          '</div>');
+            }
+        });
+    }
+    
+    // Initial load
+    loadAppointments(currentPage);
+    
+    // Search functionality
+    let searchTimeout;
+    $('#searchAppointment').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            searchQuery = $('#searchAppointment').val().trim();
+            currentPage = 1; // Reset to first page when searching
+            loadAppointments(currentPage);
+        }, 300); // Debounce search for 300ms
+    });
+    
+    // Pagination button handlers
+    $('#prevPage').on('click', function() {
+        if (currentPage > 1) {
+            loadAppointments(currentPage - 1);
+        }
+    });
+    
+    $('#nextPage').on('click', function() {
+        if (currentPage < totalPages) {
+            loadAppointments(currentPage + 1);
+        }
+    });
+
+    // Reload appointments when date changes
+    $('.calendar-day').on('click', function() {
+        currentPage = 1; // Reset to first page when date changes
+        searchQuery = ''; // Clear search when date changes
+        $('#searchAppointment').val(''); // Clear search input
+        loadAppointments(currentPage);
+    });
+});
 </script>
 
-<style>
-    /* Tailwind custom fonts */
-    .font-heading {
-        font-family: 'Poppins', sans-serif;
-    }
-    .font-body {
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* Custom animations */
-    .animate-fade-in {
-        animation: fadeIn 0.5s ease-in;
-    }
-    .animate-slide-up {
-        animation: slideUp 0.5s ease-out;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    @keyframes slideUp {
-        from { transform: translateY(20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #f8fafc;
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #ccfbf1;
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #99f6e4;
-    }
-
-    /* Smooth transitions */
-    .transition-all {
-        transition: all 0.3s ease;
-    }
-
-    /* Mobile adjustments */
-    @media (max-width: 640px) {
-        #schedule {
-            padding: 4px;
-        }
-        .grid-cols-7 {
-            gap: 0.5rem;
-        }
-        .h-16 {
-            height: 4rem;
-        }
-        .text-sm {
-            font-size: 0.75rem;
-        }
-        .text-xs {
-            font-size: 0.625rem;
-        }
-        .fixed.inset-0 > div {
-            width: 90% !important;
-            max-width: none !important;
-            margin: 0 auto;
-        }
-    }
-</style>
 </body>
-</html>
