@@ -1,3 +1,289 @@
+<?php
+session_start();
+require_once 'config/db.php';
+
+// Create login_attempts table if it doesn't exist
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        success TINYINT(1) NOT NULL,
+        attempt_time DATETIME NOT NULL,
+        ban_until DATETIME NULL,
+        INDEX idx_username_time (username, attempt_time)
+    )");
+} catch (PDOException $e) {
+    error_log("Error creating login_attempts table: " . $e->getMessage());
+}
+
+// Function to log audit events
+function logAudit($pdo, $user_id, $username, $action, $status, $ip_address) {
+    $stmt = $pdo->prepare("INSERT INTO user_logs (user_id, username, action, status, ip_address) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$user_id, $username, $action, $status, $ip_address]);
+}
+
+// Function to check if user is banned
+function isUserBanned($pdo, $username) {
+    $stmt = $pdo->prepare("SELECT ban_until FROM login_attempts WHERE username = ? AND ban_until > NOW() ORDER BY attempt_time DESC LIMIT 1");
+    $stmt->execute([$username]);
+    $result = $stmt->fetch();
+    return $result ? $result['ban_until'] : false;
+}
+
+// Function to record login attempt
+function recordLoginAttempt($pdo, $username, $success) {
+    $stmt = $pdo->prepare("INSERT INTO login_attempts (username, success, attempt_time) VALUES (?, ?, NOW())");
+    $stmt->execute([$username, $success ? 1 : 0]);
+}
+
+// Function to get failed attempts count
+function getFailedAttempts($pdo, $username) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE username = ? AND success = 0 AND attempt_time > DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+    $stmt->execute([$username]);
+    return $stmt->fetchColumn();
+}
+
+// Function to calculate ban duration
+function calculateBanDuration($attempts) {
+    $baseDuration = 30; // 30 seconds
+    $multiplier = pow(2, floor(($attempts - 1) / 3));
+    return $baseDuration * $multiplier;
+}
+
+// Function to record login history
+function recordLoginHistory($pdo, $user_id, $name, $role) {
+    $stmt = $pdo->prepare("INSERT INTO login_history (user_id, name, role) VALUES (?, ?, ?)");
+    $stmt->execute([$user_id, $name, $role]);
+}
+
+$ip_address = $_SERVER['REMOTE_ADDR'] ?? 'N/A';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Handle Login
+    if (isset($_POST['action']) && $_POST['action'] === 'login') {
+        $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_STRING);
+        $password = $_POST['password'];
+
+        if (empty($username) || empty($password)) {
+            $_SESSION['error'] = "Please fill in all fields";
+            logAudit($pdo, null, $username, 'Login Attempt', 'Failure: Missing Fields', $ip_address);
+            header("Location: login.php");
+            exit();
+        }
+
+        // Check if user is banned
+        $banUntil = isUserBanned($pdo, $username);
+        if ($banUntil) {
+            $_SESSION['error'] = "Account is temporarily locked. Please try again after " . date('H:i:s', strtotime($banUntil));
+            header("Location: login.php");
+            exit();
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT u.*, s.role, s.id as staff_id, p.id as patient_id, p.name as patient_name, s.name as staff_name 
+                                  FROM users u 
+                                  LEFT JOIN staff s ON u.staff_id = s.id 
+                                  LEFT JOIN patients p ON u.patient_id = p.id 
+                                  WHERE u.username = ? AND u.status = 1");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch();
+
+            if ($user && password_verify($password, $user['pass'])) {
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                logAudit($pdo, $user['id'], $user['username'], 'Login', 'Success', $ip_address);
+                recordLoginAttempt($pdo, $username, true);
+
+                // Record login history
+                $role = $user['patient_id'] ? 'patient' : $user['role'];
+                $name = $user['patient_id'] ? $user['patient_name'] : $user['staff_name'];
+                recordLoginHistory($pdo, $user['id'], $name, $role);
+
+                if ($user['patient_id']) {
+                    $_SESSION['user_role'] = 'patient';
+                    $_SESSION['patient_id'] = $user['patient_id'];
+                    header("Location: patient_dashboard.php");
+                } else if ($user['staff_id']) {
+                    $_SESSION['user_role'] = $user['role'];
+                    $_SESSION['staff_id'] = $user['staff_id'];
+                    
+                    if ($user['role'] === 'admin') {
+                        header("Location: index.php");
+                    } else if ($user['role'] === 'doctor') {
+                        header("Location: doctor_dashboard.php");
+                    } else if ($user['role'] === 'assistant') {
+                        $stmt = $pdo->prepare("SELECT d.doctor_id, s.name as doctor_name 
+                                              FROM doctor d 
+                                              JOIN staff s ON d.doctor_id = s.id 
+                                              WHERE d.assistant_id = ?");
+                        $stmt->execute([$user['staff_id']]);
+                        $doctor = $stmt->fetch();
+                        if ($doctor) {
+                            $_SESSION['assigned_doctor_id'] = $doctor['doctor_id'];
+                            $_SESSION['assigned_doctor_name'] = $doctor['doctor_name'];
+                            header("Location: doctor_dashboard.php");
+                        } else {
+                            logAudit($pdo, $user['id'], $user['username'], 'Login Attempt', 'Failure: No Doctor Assigned', $ip_address);
+                            $_SESSION['error'] = "Invalid username or password";
+                            header("Location: login.php");
+                        }
+                    }
+                }
+                exit();
+            } else {
+                recordLoginAttempt($pdo, $username, false);
+                $failedAttempts = getFailedAttempts($pdo, $username);
+                
+                if ($failedAttempts >= 3) {
+                    $banDuration = calculateBanDuration($failedAttempts);
+                    $stmt = $pdo->prepare("INSERT INTO login_attempts (username, success, attempt_time, ban_until) VALUES (?, 0, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND))");
+                    $stmt->execute([$username, $banDuration]);
+                    
+                    $_SESSION['error'] = "Too many failed attempts. Account is locked for " . $banDuration . " seconds.";
+                } else {
+                    $_SESSION['error'] = "Invalid username or password. " . (3 - $failedAttempts) . " attempts remaining before temporary lockout.";
+                }
+                
+                logAudit($pdo, $user['id'] ?? null, $username, 'Login Attempt', $user ? 'Failure: Incorrect Password' : 'Failure: Username Not Found', $ip_address);
+                header("Location: login.php");
+                exit();
+            }
+        } catch (PDOException $e) {
+            $_SESSION['error'] = "An error occurred. Please try again later.";
+            error_log($e->getMessage());
+            logAudit($pdo, null, $username, 'Login Attempt', 'Failure: Database Error', $ip_address);
+            header("Location: login.php");
+            exit();
+        }
+    }
+
+    // Handle Patient Registration
+    if (isset($_POST['action']) && $_POST['action'] === 'register') {
+        $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
+        $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+        $phone = filter_input(INPUT_POST, 'phone', FILTER_SANITIZE_STRING);
+        $address = filter_input(INPUT_POST, 'address', FILTER_SANITIZE_STRING);
+        $birthdate = $_POST['birthdate'];
+        $gender = filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_STRING);
+        $status = 1;
+
+        if (empty($name) || empty($email) || empty($phone) || empty($address) || empty($birthdate) || empty($gender)) {
+            $_SESSION['error'] = "Please fill in all required fields";
+            header("Location: login.php");
+            exit();
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT id FROM patients WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                $_SESSION['error'] = "Email already registered";
+                header("Location: login.php");
+                exit();
+            }
+
+            $photo_path = null;
+            if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+                $upload_dir = 'Uploads/patients/';
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0777, true);
+                }
+                $file_extension = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+                $allowed_extensions = ['jpg', 'jpeg', 'png'];
+                if (!in_array($file_extension, $allowed_extensions)) {
+                    $_SESSION['error'] = "Invalid file type. Please upload JPG, JPEG, or PNG files only.";
+                    header("Location: login.php");
+                    exit();
+                }
+                $new_filename = time() . '_' . uniqid() . '.' . $file_extension;
+                $photo_path = $upload_dir . $new_filename;
+                if (!move_uploaded_file($_FILES['photo']['tmp_name'], $photo_path)) {
+                    throw new Exception("Failed to upload photo");
+                }
+            }
+
+            $birthdate_obj = new DateTime($birthdate);
+            $today = new DateTime();
+            $age = $birthdate_obj->diff($today)->y;
+
+            $stmt = $pdo->prepare("
+                INSERT INTO patients (name, email, phone, address, birthdate, age, gender, photo, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+            $stmt->execute([
+                $name, $email, $phone, $address, $birthdate, $age, $gender, $photo_path, $status
+            ]);
+
+            $patient_id = $pdo->lastInsertId();
+
+            if ($patient_id) {
+                $_SESSION['success'] = "Registration successful! Please create a user account for the patient.";
+                $_SESSION['show_credentials_modal'] = true;
+                $_SESSION['new_patient_id'] = $patient_id;
+                header("Location: login.php");
+                exit();
+            }
+        } catch (Exception $e) {
+            $_SESSION['error'] = "An error occurred during registration: " . $e->getMessage();
+            error_log($e->getMessage());
+            header("Location: login.php");
+            exit();
+        }
+    }
+
+    // Handle User Account Creation
+    if (isset($_POST['action']) && $_POST['action'] === 'add_credentials') {
+        $patient_id = $_POST['patient_id'] ?? '';
+        $username = htmlspecialchars(trim($_POST['username'] ?? ''));
+        $password = $_POST['password'] ?? '';
+        $status = 1;
+
+        if (strlen($password) < 8) {
+            $_SESSION['error'] = "Password must be at least 8 characters long.";
+            $_SESSION['show_credentials_modal'] = true;
+            $_SESSION['new_patient_id'] = $patient_id;
+            header("Location: login.php");
+            exit();
+        }
+
+        try {
+            $check_sql = "SELECT COUNT(*) FROM users WHERE username = :username";
+            $check_stmt = $pdo->prepare($check_sql);
+            $check_stmt->execute([':username' => $username]);
+            if ($check_stmt->fetchColumn() > 0) {
+                $_SESSION['error'] = "Username already exists. Please choose a different username.";
+                $_SESSION['show_credentials_modal'] = true;
+                $_SESSION['new_patient_id'] = $patient_id;
+                header("Location: login.php");
+                exit();
+            }
+
+            $sql = "INSERT INTO users (username, pass, patient_id, status) 
+                    VALUES (:username, :password, :patient_id, :status)";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':username' => $username,
+                ':password' => password_hash($password, PASSWORD_DEFAULT),
+                ':patient_id' => $patient_id,
+                ':status' => $status
+            ]);
+
+            $_SESSION['success'] = "User account created successfully!";
+            unset($_SESSION['show_credentials_modal']);
+            unset($_SESSION['new_patient_id']);
+            header("Location: login.php");
+            exit();
+        } catch (PDOException $e) {
+            $_SESSION['error'] = "Error creating user account: " . $e->getMessage();
+            $_SESSION['show_credentials_modal'] = true;
+            $_SESSION['new_patient_id'] = $patient_id;
+            header("Location: login.php");
+            exit();
+        }
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,7 +411,8 @@
                             <h2 class="text-3xl font-heading font-bold text-neutral-dark mb-2">Welcome Back</h2>
                             <p class="text-secondary">Please sign in to your account</p>
                         </div>
-                        <form action="process_login.php" method="POST" class="space-y-6">
+                        <form action="login.php" method="POST" class="space-y-6">
+                            <input type="hidden" name="action" value="login">
                             <div>
                                 <label for="username" class="block text-sm font-medium text-neutral-dark mb-2">Username</label>
                                 <input type="text" id="username" name="username" required
@@ -158,7 +445,8 @@
                             <h2 class="text-3xl font-heading font-bold text-neutral-dark mb-2">Create Account</h2>
                             <p class="text-secondary">Please fill in your details</p>
                         </div>
-                        <form action="process_register.php" method="POST" class="space-y-6" enctype="multipart/form-data">
+                        <form action="login.php" method="POST" class="space-y-6" enctype="multipart/form-data">
+                            <input type="hidden" name="action" value="register">
                             <div>
                                 <label for="reg_name" class="block text-sm font-medium text-neutral-dark mb-2">Full Name</label>
                                 <input type="text" id="reg_name" name="name" required
@@ -218,21 +506,70 @@
                 </div>
             </div>
         </div>
+
+        <!-- Add User Account Modal -->
+        <div id="addUserModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-6 border w-full max-w-md md:w-[90%] shadow-lg rounded-xl bg-white border-primary-100">
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-neutral-dark">Create User Account</h3>
+                    <form id="addUserForm" method="POST" class="mt-4 space-y-4">
+                        <input type="hidden" name="action" value="add_credentials">
+                        <input type="hidden" name="patient_id" id="addUserPatientId">
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-neutral-dark">Username</label>
+                            <input type="text" name="username" id="addUserUsername" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3">
+                        </div>
+                        
+                        <div class="relative">
+                            <label class="block text-sm font-medium text-neutral-dark">Password</label>
+                            <input type="password" name="password" id="addUserPassword" required class="mt-1 block w-full rounded-lg border-primary-100 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3 pr-10">
+                            <button type="button" id="toggleAddUserPassword" class="absolute inset-y-0 right-0 flex items-center pr-3 mt-6 text-primary-500 hover:text-primary-700">
+                                <svg id="addUserEyeIcon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" onclick="closeAddUserModal()" class="px-4 py-2 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-all duration-200">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Create Account</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         function flipForm() {
             const container = document.getElementById('form-container');
             const isLogin = container.style.transform !== 'rotateY(180deg)';
-            
             if (isLogin) {
                 container.classList.add('register-mode');
             } else {
                 container.classList.remove('register-mode');
             }
-            
             container.style.transform = isLogin ? 'rotateY(180deg)' : 'rotateY(0deg)';
         }
+
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').classList.add('hidden');
+        }
+
+        // Password toggle for add user modal
+        document.getElementById('toggleAddUserPassword')?.addEventListener('click', function() {
+            const passwordInput = document.getElementById('addUserPassword');
+            const eyeIcon = document.getElementById('addUserEyeIcon');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />';
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />';
+            }
+        });
 
         // Hide loading overlay when page is loaded
         window.addEventListener('load', function() {
@@ -240,6 +577,11 @@
             setTimeout(() => {
                 document.querySelector('.loading-overlay').style.display = 'none';
             }, 400);
+            // Trigger user account modal if needed
+            <?php if (isset($_SESSION['show_credentials_modal']) && $_SESSION['show_credentials_modal'] && isset($_SESSION['new_patient_id'])): ?>
+                document.getElementById('addUserPatientId').value = '<?php echo htmlspecialchars($_SESSION['new_patient_id']); ?>';
+                document.getElementById('addUserModal').classList.remove('hidden');
+            <?php endif; ?>
         });
     </script>
 </body>

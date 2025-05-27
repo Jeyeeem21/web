@@ -1,4 +1,6 @@
 <?php
+
+//process register
 session_start();
 require_once 'config/db.php';
 
@@ -10,10 +12,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $address = filter_input(INPUT_POST, 'address', FILTER_SANITIZE_STRING);
     $birthdate = $_POST['birthdate'];
     $gender = filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_STRING);
+    $status = 1; // Set status to 1 by default
+
+    // Log received data
+    error_log("Registration attempt - Name: $name, Email: $email, Phone: $phone");
 
     // Validate required fields
     if (empty($name) || empty($email) || empty($phone) || empty($address) || empty($birthdate) || empty($gender)) {
         $_SESSION['error'] = "Please fill in all required fields";
+        error_log("Registration failed - Missing required fields");
         header("Location: login.php");
         exit();
     }
@@ -24,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         if ($stmt->fetch()) {
             $_SESSION['error'] = "Email already registered";
+            error_log("Registration failed - Email already exists: $email");
             header("Location: login.php");
             exit();
         }
@@ -33,7 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
             $upload_dir = 'Uploads/patients/';
             if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+                if (!mkdir($upload_dir, 0777, true)) {
+                    throw new Exception("Failed to create upload directory: $upload_dir");
+                }
             }
 
             $file_extension = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
@@ -41,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!in_array($file_extension, $allowed_extensions)) {
                 $_SESSION['error'] = "Invalid file type. Please upload JPG, JPEG, or PNG files only.";
+                error_log("Registration failed - Invalid file type: $file_extension");
                 header("Location: login.php");
                 exit();
             }
@@ -49,26 +60,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $photo_path = $upload_dir . $new_filename;
 
             if (!move_uploaded_file($_FILES['photo']['tmp_name'], $photo_path)) {
-                throw new Exception("Failed to upload photo");
+                throw new Exception("Failed to upload photo to: $photo_path");
             }
         }
 
         // Calculate age from birthdate
-        $birthdate_obj = new DateTime($birthdate);
-        $today = new DateTime();
-        $age = $birthdate_obj->diff($today)->y;
-
-        // Generate a random password
-        $temp_password = bin2hex(random_bytes(8));
-        $hashed_password = password_hash($temp_password, PASSWORD_DEFAULT);
+        try {
+            $birthdate_obj = new DateTime($birthdate);
+            $today = new DateTime();
+            $age = $birthdate_obj->diff($today)->y;
+        } catch (Exception $e) {
+            throw new Exception("Invalid birthdate format: $birthdate");
+        }
 
         // Insert new patient
         $stmt = $pdo->prepare("
-            INSERT INTO patients (name, email, phone, address, birthdate, age, gender, photo, password, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+            INSERT INTO patients (name, email, phone, address, birthdate, age, gender, photo, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
 
-        $stmt->execute([
+        $params = [
             $name,
             $email,
             $phone,
@@ -77,29 +88,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $age,
             $gender,
             $photo_path,
-            $hashed_password
-        ]);
+            $status
+        ];
 
-        // Send email with temporary password
-        $to = $email;
-        $subject = "Welcome to Our Clinic - Your Account Details";
-        $message = "Dear " . $name . ",\n\n";
-        $message .= "Welcome to our clinic! Your account has been created successfully.\n\n";
-        $message .= "Your temporary password is: " . $temp_password . "\n";
-        $message .= "Please login and change your password immediately.\n\n";
-        $message .= "Best regards,\nClinic Team";
+        // Log the SQL parameters
+        error_log("Registration SQL parameters: " . print_r($params, true));
 
-        $headers = "From: clinic@example.com";
+        if (!$stmt->execute($params)) {
+            throw new Exception("Failed to execute patient insert: " . implode(", ", $stmt->errorInfo()));
+        }
 
-        mail($to, $subject, $message, $headers);
+        $patient_id = $pdo->lastInsertId();
+        error_log("Registration successful - Patient ID: $patient_id");
 
-        $_SESSION['success'] = "Registration successful! Please check your email for login details.";
-        header("Location: login.php");
-        exit();
+        if ($patient_id) {
+            $_SESSION['success'] = "Registration successful! Please create a user account for the patient.";
+            $_SESSION['show_credentials_modal'] = true;
+            $_SESSION['new_patient_id'] = $patient_id;
+            header("Location: login.php");
+            exit();
+        } else {
+            throw new Exception("Failed to get last insert ID");
+        }
 
     } catch (Exception $e) {
-        $_SESSION['error'] = "An error occurred during registration. Please try again.";
-        error_log($e->getMessage());
+        error_log("Registration error: " . $e->getMessage());
+        $_SESSION['error'] = "An error occurred during registration: " . $e->getMessage();
         header("Location: login.php");
         exit();
     }

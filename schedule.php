@@ -44,7 +44,7 @@ if (isset($_GET['action'])) {
             }
             
             // Get clinic details
-            $stmt = $pdo->query("SELECT * FROM clinic_details WHERE id = 1");
+            $stmt = $pdo->query("SELECT * FROM clinic_details ORDER BY created_at DESC LIMIT 1");
             $clinic = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$clinic) {
@@ -72,7 +72,7 @@ if (isset($_GET['action'])) {
                 exit();
             }
             
-            // Parse clinic hours
+            // Parse clinic hours (e.g., "9:00 AM - 5:00 PM")
             $hours = explode(' - ', $clinicHours);
             $startTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[0]))));
             $endTime = date('H:i:s', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[1]))));
@@ -120,11 +120,15 @@ if (isset($_GET['action'])) {
             
             error_log("Start Hour: $startHour, End Hour: $endHour");
             
-            for ($hour = $startHour; $hour < $endHour; $hour++) {
+            // Convert clinic hours to 24-hour format for comparison
+            $clinicStartHour = intval(date('H', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[0])))));
+            $clinicEndHour = intval(date('H', strtotime(str_replace(' AM', 'am', str_replace(' PM', 'pm', $hours[1])))));
+            
+            for ($hour = $clinicStartHour; $hour < $clinicEndHour; $hour++) {
                 if ($hour != 12) { // Skip lunch hour
                     if (!in_array($hour, $bookedHours)) {
                         $timeStr = sprintf('%02d:00:00', $hour);
-                        $formattedSlot = date('h:00 A', strtotime($timeStr));
+                        $formattedSlot = date('h:i A', strtotime($timeStr));
                         $availableSlots[] = $formattedSlot;
                     }
                 }
@@ -474,7 +478,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                         service_id = :service_id,
                         appointment_date = :appointment_date,
                         appointment_time = :appointment_time,
-                        status = :status,
+                        status = 'Scheduled',
                         remarks = :remarks,
                         updated_at = NOW()
                         WHERE id = :appointment_id";
@@ -485,7 +489,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                     ':service_id' => $service_id,
                     ':appointment_date' => $appointment_date,
                     ':appointment_time' => $dbTime,
-                    ':status' => $status,
                     ':remarks' => $remarks,
                     ':appointment_id' => $appointment_id
                 ]);
@@ -495,7 +498,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                 $sql = "INSERT INTO appointments (patient_id, staff_id, service_id, appointment_date, 
                         appointment_time, status, remarks, created_at) 
                         VALUES (:patient_id, :staff_id, :service_id, :appointment_date, 
-                        :appointment_time, :status, :remarks, NOW())";
+                        :appointment_time, 'Scheduled', :remarks, NOW())";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
                     ':patient_id' => $patient_id,
@@ -503,7 +506,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                     ':service_id' => $service_id,
                     ':appointment_date' => $appointment_date,
                     ':appointment_time' => $dbTime,
-                    ':status' => $status,
                     ':remarks' => $remarks
                 ]);
                 $message = 'Appointment scheduled successfully!';
@@ -795,8 +797,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_paginated_appointments') {
 }
 ?>
 
-<div id="schedule" class="space-y-6">
-    <h2 class="text-2xl font-semibold text-gray-800 mb-6">Appointment Schedule</h2>
+<div id="schedule" class="space-y-8 bg-neutral-light p-6 md:p-8 animate-fade-in">
+    <h2 class="text-2xl md:text-3xl font-heading font-bold text-primary-500">Appointment Schedule</h2>
     
     <!-- Success/Error Message -->
     <?php if (isset($_GET['success']) || $error || $success): ?>
@@ -1084,6 +1086,29 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_paginated_appointments') {
         <input type="hidden" name="id" id="appointmentId">
         <input type="hidden" name="status" id="appointmentStatus">
     </form>
+
+    <!-- Receipt Modal -->
+    <div id="receiptModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-6 border w-full max-w-md md:w-[90%] shadow-lg rounded-xl bg-white border-primary-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-neutral-dark">Payment Receipt</h3>
+                <button onclick="closeReceiptModal()" class="text-neutral-dark hover:text-primary-500 transition-colors duration-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="receiptContent" class="space-y-4">
+                <!-- Receipt content will be loaded here -->
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeReceiptModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">
+                    Close
+                </button>
+                <button onclick="printReceiptContent()" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">
+                    <i class="fas fa-print mr-2"></i>Print Receipt
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -1470,6 +1495,7 @@ $(document).ready(function() {
         e.preventDefault();
         
         const formData = $(this).serialize();
+        const appointmentId = $('#paymentAppointmentId').val();
         $(this).find('button[type="submit"]').prop('disabled', true);
         
         $.ajax({
@@ -1479,9 +1505,13 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    alert(response.message);
                     closePaymentModal();
-                    window.location.reload();
+                    // Show receipt after successful payment
+                    printReceipt(appointmentId);
+                    // Wait for receipt to be shown before reloading
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 4000);
                 } else {
                     alert(response.message || 'Error recording payment. Please try again.');
                 }
@@ -1596,7 +1626,7 @@ $(document).ready(function() {
                                                         <p class="text-xs text-black">${appointment.service_name}</p>
                                                     </div>
                                                     <div class="text-right space-y-0.5">
-                                                        <p class="text-sm font-medium ${statusTextClass}">${new Date('1970-01-01T' + appointment.appointment_time + 'Z').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+                                                        <p class="text-sm font-medium ${statusTextClass}">${formatTime(appointment.appointment_time)}</p>
                                                         <p class="text-xs text-neutral-dark">${appointment.service_duration}</p>
                                                     </div>
                                                 </div>
@@ -1618,6 +1648,13 @@ $(document).ready(function() {
                                                             <button type="button" class="text-xs bg-gradient-to-r from-danger-700 to-danger-800 text-black px-2.5 py-1 rounded-lg hover:from-danger-800 hover:to-danger-900 transition-all duration-200 shadow-sm" 
                                                                     onclick="updateStatus(${appointment.id}, 'Cancelled')">
                                                                 Cancel
+                                                            </button>
+                                                        </div>
+                                                    ` : appointment.status === 'Completed' ? `
+                                                        <div class="flex space-x-2">
+                                                            <button type="button" class="text-xs bg-gradient-to-r from-primary-700 to-primary-800 text-black px-2.5 py-1 rounded-lg hover:from-primary-800 hover:to-primary-900 transition-all duration-200 shadow-sm" 
+                                                                    onclick="printReceipt(${appointment.id})">
+                                                                Receipt
                                                             </button>
                                                         </div>
                                                     ` : ''}
@@ -1683,6 +1720,260 @@ $(document).ready(function() {
         loadAppointments(currentPage);
     });
 });
+
+function printReceipt(appointmentId) {
+    console.log('printReceipt called with ID:', appointmentId);
+    if (!appointmentId) {
+        console.error('Invalid appointment ID');
+        alert('Invalid appointment ID');
+        return;
+    }
+
+    // Show loading state
+    $('#receiptContent').html('<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-primary-500"></i> Loading receipt...</div>');
+    document.getElementById('receiptModal').classList.remove('hidden');
+
+    console.log('Making AJAX request to schedule.php');
+    
+    $.ajax({
+        url: 'schedule.php',
+        type: 'GET',
+        data: {
+            action: 'get_receipt_details',
+            id: appointmentId
+        },
+        dataType: 'json',
+        success: function(response) {
+            console.log('AJAX response received:', response);
+            try {
+                if (response.success) {
+                    const receipt = response.receipt;
+                    const clinic = response.clinic;
+                    const doctor = response.doctor;
+                    
+                    // Validate required data
+                    if (!receipt || !clinic || !doctor) {
+                        console.error('Missing required data:', { receipt, clinic, doctor });
+                        $('#receiptContent').html('<div class="text-center py-4 text-red-500">Error: Missing required data</div>');
+                        return;
+                    }
+
+                    const receiptHtml = `
+                        <div class="text-center mb-6">
+                            <img src="${clinic.logo}" alt="${clinic.name}" class="h-16 mx-auto mb-2">
+                            <h2 class="text-xl font-bold">${clinic.name}</h2>
+                            <p class="text-sm">${clinic.address}</p>
+                            <p class="text-sm">Tel: ${clinic.phone}</p>
+                            <p class="text-sm">Email: ${clinic.email}</p>
+                            <div class="mt-2 text-xs">
+                                <p><strong>Hours:</strong></p>
+                                <p>Weekdays: ${clinic.hours_weekdays}</p>
+                                <p>Saturday: ${clinic.hours_saturday}</p>
+                                <p>Sunday: ${clinic.hours_sunday}</p>
+                            </div>
+                        </div>
+                        <div class="border-t border-b border-gray-200 py-4 mb-4">
+                            <h3 class="text-lg font-semibold mb-2">Payment Receipt</h3>
+                            <p class="text-sm">Receipt No: ${receipt.id}</p>
+                            <p class="text-sm">Date: ${receipt.payment_date}</p>
+                            <p class="text-sm">Time: ${receipt.payment_time}</p>
+                        </div>
+                        <div class="mb-4">
+                            <p class="text-sm"><strong>Patient:</strong> ${receipt.patient_name}</p>
+                            <p class="text-sm"><strong>Service:</strong> ${receipt.service_name}</p>
+                            <p class="text-sm"><strong>Doctor:</strong> Dr. ${doctor.name}</p>
+                            <p class="text-sm"><strong>Appointment Date:</strong> ${receipt.appointment_date}</p>
+                            <p class="text-sm"><strong>Appointment Time:</strong> ${receipt.appointment_time}</p>
+                            <p class="text-sm"><strong>Payment Method:</strong> ${receipt.payment_method}</p>
+                            <p class="text-sm"><strong>Amount:</strong> ₱${parseFloat(receipt.amount).toFixed(2)}</p>
+                        </div>
+                        <div class="border-t border-gray-200 pt-4">
+                            <p class="text-sm text-center">Thank you for choosing our services!</p>
+                        </div>
+                    `;
+                    
+                    $('#receiptContent').html(receiptHtml);
+                } else {
+                    // Show detailed error message
+                    const errorMessage = response.message || 'Unknown error occurred';
+                    const debugInfo = response.debug_info ? JSON.stringify(response.debug_info) : '';
+                    $('#receiptContent').html(`
+                        <div class="text-center py-4">
+                            <div class="text-red-500 mb-2">${errorMessage}</div>
+                            ${debugInfo ? `<div class="text-xs text-gray-500">Debug Info: ${debugInfo}</div>` : ''}
+                        </div>
+                    `);
+                }
+            } catch (e) {
+                console.error('Error processing receipt:', e);
+                $('#receiptContent').html(`
+                    <div class="text-center py-4">
+                        <div class="text-red-500 mb-2">Error processing receipt data</div>
+                        <div class="text-xs text-gray-500">${e.message}</div>
+                    </div>
+                `);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX Error:', {xhr, status, error});
+            let errorMessage = 'Error loading receipt details';
+            try {
+                const response = JSON.parse(xhr.responseText);
+                errorMessage = response.message || errorMessage;
+            } catch (e) {
+                console.error('Error parsing response:', e);
+            }
+            
+            $('#receiptContent').html(`
+                <div class="text-center py-4">
+                    <div class="text-red-500 mb-2">${errorMessage}</div>
+                    <div class="text-xs text-gray-500">
+                        Status: ${status}<br>
+                        Error: ${error}
+                    </div>
+                </div>
+            `);
+        }
+    });
+}
+
+function closeReceiptModal() {
+    document.getElementById('receiptModal').classList.add('hidden');
+}
+
+function printReceiptContent() {
+    const receiptContent = document.getElementById('receiptContent').innerHTML;
+    const printWindow = window.open('', '_blank');
+    
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Payment Receipt</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 0;
+                    }
+                    body {
+                        width: 80mm;
+                        margin: 0;
+                        padding: 5mm;
+                        font-family: 'Courier New', monospace;
+                        font-size: 12px;
+                        line-height: 1.2;
+                    }
+                    .receipt-header {
+                        text-align: center;
+                        margin-bottom: 8px;
+                    }
+                    .receipt-header img {
+                        max-width: 25mm;
+                        height: auto;
+                        margin-bottom: 2px;
+                    }
+                    .receipt-header h2 {
+                        font-size: 11px;
+                        font-weight: bold;
+                        margin: 2px 0;
+                    }
+                    .receipt-header p {
+                        margin: 1px 0;
+                        font-size: 8px;
+                    }
+                    .receipt-details {
+                        border-top: 1px dashed #000;
+                        border-bottom: 1px dashed #000;
+                        padding: 2px 0;
+                        margin: 2px 0;
+                    }
+                    .receipt-details h3 {
+                        font-size: 10px;
+                        font-weight: bold;
+                        margin: 2px 0;
+                    }
+                    .receipt-details p {
+                        margin: 1px 0;
+                        font-size: 8px;
+                    }
+                    .receipt-info p {
+                        margin: 1px 0;
+                        font-size: 8px;
+                    }
+                    .receipt-footer {
+                        text-align: center;
+                        margin-top: 5px;
+                        border-top: 1px dashed #000;
+                        padding-top: 2px;
+                    }
+                    .receipt-footer p {
+                        margin: 1px 0;
+                        font-size: 8px;
+                    }
+                    @media print {
+                        body { 
+                            padding: 0;
+                            margin: 0;
+                        }
+                        .no-print { 
+                            display: none; 
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="receipt-header">
+                    <img src="${document.querySelector('#receiptContent img')?.src || ''}" alt="Clinic Logo">
+                    <h2>${document.querySelector('#receiptContent h2')?.textContent || 'Clinic Name'}</h2>
+                    <p>${document.querySelector('#receiptContent p:nth-of-type(1)')?.textContent || 'Address'}</p>
+                    <p>${document.querySelector('#receiptContent p:nth-of-type(2)')?.textContent || 'Phone'}</p>
+                    <p>${document.querySelector('#receiptContent p:nth-of-type(3)')?.textContent || 'Email'}</p>
+                </div>
+                <div class="receipt-details">
+                    <h3>Payment Receipt</h3>
+                    <p>Receipt No: ${document.querySelector('#receiptContent .border-t p:nth-of-type(1)')?.textContent.replace('Receipt No: ', '') || ''}</p>
+                    <p>Date: ${document.querySelector('#receiptContent .border-t p:nth-of-type(2)')?.textContent.replace('Date: ', '') || ''}</p>
+                    <p>Time: ${document.querySelector('#receiptContent .border-t p:nth-of-type(3)')?.textContent.replace('Time: ', '') || ''}</p>
+                </div>
+                <div class="receipt-info">
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(1)')?.textContent || ''}</p>
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(2)')?.textContent || ''}</p>
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(3)')?.textContent || ''}</p>
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(4)')?.textContent || ''}</p>
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(5)')?.textContent || ''}</p>
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(6)')?.textContent || ''}</p>
+                    <p>${document.querySelector('#receiptContent .mb-4 p:nth-of-type(7)')?.textContent || ''}</p>
+                </div>
+                <div class="receipt-footer">
+                    <p>Thank you for choosing our services!</p>
+                </div>
+            </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    
+    // Automatically trigger print after a short delay
+    setTimeout(() => {
+        printWindow.print();
+        // Close the window after printing
+        setTimeout(() => {
+            printWindow.close();
+        }, 1000);
+    }, 500);
+}
+function formatTime(timeStr) {
+    if (!timeStr) return '';
+    
+    // Remove any seconds if present
+    timeStr = timeStr.split(':').slice(0, 2).join(':');
+    
+    // Convert to 12-hour format
+    const [hours, minutes] = timeStr.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+}
 </script>
 
 </body>

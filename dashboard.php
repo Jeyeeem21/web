@@ -236,7 +236,21 @@ $currentYear = $currentDateTime->format('Y'); // e.g., 2025
                 {
                     extend: 'pdf',
                     text: '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H3a2 2 0 01-2-2V3a2 2 0 012-2h18a2 2 0 012 2v16a2 2 0 01-2 2z" /></svg> PDF',
-                    className: 'bg-gradient-to-r from-primary-500 to-accent-300 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:scale-105 transition-all duration-200'
+                    className: 'bg-gradient-to-r from-primary-500 to-accent-300 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:scale-105 transition-all duration-200',
+                    pageSize: 'LETTER',
+                    customize: function (doc) {
+                        // Set content width to 100% minus margins
+                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1).join('*').split('');
+
+                        // Optional: Adjust font size for better fit if needed
+                        // doc.defaultStyle.fontSize = 10; 
+
+                        // Optional: Add a header
+                        // doc.content.splice(0, 0, { text: 'Appointments Table', style: 'header', alignment: 'center', margin: [0, 0, 0, 20] });
+                        
+                        // Optional: Define styles
+                        // doc.styles.header = { fontSize: 18, bold: true };
+                    }
                 }
             ],
             responsive: true,
@@ -652,45 +666,181 @@ $currentYear = $currentDateTime->format('Y'); // e.g., 2025
         // Function to print only the DataTable content
         function printDataTable() {
             const printWindow = window.open('', '_blank');
-            const tableContent = document.getElementById('appointmentsTable').outerHTML;
+            
+            // Get all data from DataTable
+            const allData = appointmentsTable.rows().data().toArray();
+            
+            // Create table HTML with all data
+            let tableHTML = `
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Treatment</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            // Add all rows to the table
+            allData.forEach(row => {
+                const statusClasses = {
+                    'Completed': 'bg-success-light text-success',
+                    'Pending': 'bg-accent-100 text-accent-500',
+                    'Cancelled': 'bg-red-100 text-red-800'
+                };
+                
+                tableHTML += `
+                    <tr>
+                        <td>
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-8 w-8">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="${row.patient_image || 'https://randomuser.me/api/portraits/lego/1.jpg'}" alt="">
+                                </div>
+                                <div class="ml-3">
+                                    <div class="text-sm font-medium text-neutral-dark">${row.patient_name}</div>
+                                    <div class="text-xs text-secondary">${row.patient_email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${row.appointment_date}</td>
+                        <td>${row.appointment_time}</td>
+                        <td>${row.treatment}</td>
+                        <td><span class="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${statusClasses[row.status]}">${row.status}</span></td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
             const printStyles = `
                 <style>
-                    body { font-family: 'Inter', sans-serif; margin: 20px; background-color: #f8fafc; }
-                    h2 { font-family: 'Poppins', sans-serif; color: #1e293b; margin-bottom: 20px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { 
+                    @page {
+                        size: 8.5in 11in;
+                        margin: 0.5in;
+                    }
+                    body { 
+                        font-family: 'Inter', sans-serif; 
+                        margin: 0;
+                        padding: 0;
+                        background-color: white;
+                        width: 100%;
+                    }
+                    h2 { 
+                        font-family: 'Poppins', sans-serif; 
+                        color: #1e293b; 
+                        margin: 0 0 20px 0;
+                        font-size: 18px;
+                    }
+                    .print-table { 
+                        width: 100%; 
+                        border-collapse: collapse;
+                        margin: 0;
+                        page-break-inside: auto;
+                    }
+                    .print-table th, .print-table td { 
                         border: 1px solid #ccfbf1; 
-                        padding: 12px; 
+                        padding: 8px; 
                         text-align: left; 
-                        font-size: 12px;
+                        font-size: 11px;
                         color: #1e293b;
                     }
-                    th { 
+                    .print-table th { 
                         background-color: #f8fafc; 
                         color: #14b8a6; 
                         text-transform: uppercase; 
                         font-weight: 500;
                     }
-                    tr:nth-child(even) { background-color: #f8fafc; }
-                    tr:hover { background-color: #ccfbf1; }
-                    img { width: 32px; height: 32px; border-radius: 50%; margin-right: 8px; }
-                    .flex { display: flex; align-items: center; }
-                    .text-sm { font-size: 14px; }
-                    .text-xs { font-size: 12px; }
-                    .text-neutral-dark { color: #1e293b; }
-                    .text-secondary { color: #475569; }
-                    .bg-success-light { background-color: #d1fae5; }
-                    .text-success { color: #10b981; }
-                    .bg-accent-100 { background-color: #fef3c7; }
-                    .text-accent-500 { color: #d97706; }
-                    .bg-red-100 { background-color: #fee2e2; }
-                    .text-red-800 { color: #991b1b; }
-                    .px-2 { padding-left: 8px; padding-right: 8px; }
-                    .py-1 { padding-top: 4px; padding-bottom: 4px; }
-                    .inline-flex { display: inline-flex; }
-                    .leading-5 { line-height: 1.25; }
-                    .font-medium { font-weight: 500; }
-                    .rounded-full { border-radius: 9999px; }
+                    .print-table tr { 
+                        page-break-inside: avoid;
+                        page-break-after: auto;
+                    }
+                    .print-table tr:nth-child(even) { background-color: #f8fafc; }
+                    .print-table img { 
+                        width: 24px; 
+                        height: 24px; 
+                        border-radius: 50%; 
+                        margin-right: 8px; 
+                    }
+                    .flex { 
+                        display: flex; 
+                        align-items: center; 
+                    }
+                    .text-sm { 
+                        font-size: 11px; 
+                    }
+                    .text-xs { 
+                        font-size: 10px; 
+                    }
+                    .text-neutral-dark { 
+                        color: #1e293b; 
+                    }
+                    .text-secondary { 
+                        color: #475569; 
+                    }
+                    .bg-success-light { 
+                        background-color: #d1fae5; 
+                    }
+                    .text-success { 
+                        color: #10b981; 
+                    }
+                    .bg-accent-100 { 
+                        background-color: #fef3c7; 
+                    }
+                    .text-accent-500 { 
+                        color: #d97706; 
+                    }
+                    .bg-red-100 { 
+                        background-color: #fee2e2; 
+                    }
+                    .text-red-800 { 
+                        color: #991b1b; 
+                    }
+                    .px-2 { 
+                        padding-left: 6px; 
+                        padding-right: 6px; 
+                    }
+                    .py-1 { 
+                        padding-top: 2px; 
+                        padding-bottom: 2px; 
+                    }
+                    .inline-flex { 
+                        display: inline-flex; 
+                    }
+                    .leading-5 { 
+                        line-height: 1.25; 
+                    }
+                    .font-medium { 
+                        font-weight: 500; 
+                    }
+                    .rounded-full { 
+                        border-radius: 9999px; 
+                    }
+                    @media print {
+                        body {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        .print-table {
+                            page-break-inside: auto;
+                        }
+                        .print-table tr {
+                            page-break-inside: avoid;
+                            page-break-after: auto;
+                        }
+                        .print-table thead {
+                            display: table-header-group;
+                        }
+                        .print-table tfoot {
+                            display: table-footer-group;
+                        }
+                    }
                 </style>
             `;
             
@@ -701,8 +851,8 @@ $currentYear = $currentDateTime->format('Y'); // e.g., 2025
                         ${printStyles}
                     </head>
                     <body>
-                        <h2 class="text-neutral-dark">Recent Appointments</h2>
-                        ${tableContent}
+                        <h2>Recent Appointments</h2>
+                        ${tableHTML}
                     </body>
                 </html>
             `);

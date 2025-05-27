@@ -13,16 +13,36 @@ $stmt = $pdo->prepare("SELECT * FROM patients WHERE id = ?");
 $stmt->execute([$_SESSION['patient_id']]);
 $patient = $stmt->fetch();
 
-// Get patient's appointments
+// Get clinic details
+$stmt = $pdo->query("SELECT * FROM clinic_details LIMIT 1");
+$clinic = $stmt->fetch();
+
+// Pagination settings
+$items_per_page = 5;
+$current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($current_page - 1) * $items_per_page;
+
+// Get total number of appointments
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM appointments WHERE patient_id = ?");
+$stmt->execute([$_SESSION['patient_id']]);
+$total_appointments = $stmt->fetchColumn();
+$total_pages = ceil($total_appointments / $items_per_page);
+
+// Get paginated appointments
 $stmt = $pdo->prepare("
-    SELECT a.*, s.name as doctor_name, dp.doctor_position as doctor_position
+    SELECT a.*, s.name as doctor_name, dp.doctor_position as doctor_position, sp.service_name
     FROM appointments a
     JOIN staff s ON a.staff_id = s.id
     LEFT JOIN doctor_position dp ON s.doctor_position_id = dp.id
+    JOIN services sp ON a.service_id = sp.id
     WHERE a.patient_id = ?
     ORDER BY a.appointment_date DESC
+    LIMIT ?, ?
 ");
-$stmt->execute([$_SESSION['patient_id']]);
+$stmt->bindValue(1, $_SESSION['patient_id'], PDO::PARAM_INT);
+$stmt->bindValue(2, $offset, PDO::PARAM_INT);
+$stmt->bindValue(3, $items_per_page, PDO::PARAM_INT);
+$stmt->execute();
 $appointments = $stmt->fetchAll();
 
 // Get all active services
@@ -146,11 +166,13 @@ while ($current <= $end) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patient Dashboard</title>
+    <title><?php echo htmlspecialchars($clinic['clinic_name']); ?> - Patient Dashboard</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
@@ -196,69 +218,160 @@ while ($current <= $end) {
     </script>
 </head>
 <body class="bg-gray-50 font-sans">
-    <header class="bg-white shadow-md">
-        <div class="container mx-auto px-6 py-4">
+    <header class="bg-white shadow-sm border-b border-gray-100">
+        <div class="container mx-auto px-4 sm:px-6 py-4">
+            <!-- Main header flex container -->
             <div class="flex justify-between items-center">
-                <h1 class="text-2xl font-heading font-bold text-primary-500">Patient Dashboard</h1>
+                <!-- Left side: Logo and Clinic Name -->
+                <div class="flex items-center space-x-3">
+                    <div class="relative w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-primary-50 to-accent-100 shadow-sm">
+                        <?php if (!empty($clinic['logo'])): ?>
+                            <img src="<?php echo htmlspecialchars($clinic['logo']); ?>" 
+                                 alt="<?php echo htmlspecialchars($clinic['clinic_name']); ?>" 
+                                 class="w-full h-full object-cover">
+                        <?php else: ?>
+                            <i class="fas fa-hospital text-primary-500 text-2xl absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></i>
+                        <?php endif; ?>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-xl font-heading font-bold bg-gradient-to-r from-primary-500 to-accent-300 bg-clip-text text-transparent">
+                            <?php echo htmlspecialchars($clinic['clinic_name']); ?>
+                        </h1>
+                        <p class="text-xs text-secondary">Welcome, <?php echo htmlspecialchars($patient['name']); ?></p>
+                    </div>
+                </div>
+
+                <!-- Right side: Navigation and Profile -->
                 <div class="flex items-center space-x-4">
-                    <span class="text-secondary">Welcome, <?php echo htmlspecialchars($patient['name']); ?></span>
-                    <a href="logout.php" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-4 py-2 rounded-lg text-sm hover:scale-105 transition-all duration-200">
+                    <!-- Desktop Navigation -->
+                    <nav class="hidden md:flex items-center space-x-6">
+                        <a href="#statistics" class="nav-link text-neutral-dark hover:text-primary-500 transition-all duration-200 flex items-center space-x-2">
+                            <i class="fas fa-chart-line text-primary-500"></i>
+                            <span class="text-sm font-medium">Statistics</span>
+                        </a>
+                        <a href="#appointments" class="nav-link text-neutral-dark hover:text-primary-500 transition-all duration-200 flex items-center space-x-2">
+                            <i class="fas fa-calendar-check text-primary-500"></i>
+                            <span class="text-sm font-medium">Appointments</span>
+                        </a>
+                    </nav>
+
+                    <!-- Patient Menu -->
+                    <div class="relative">
+                        <button id="patientMenuTrigger" class="flex items-center space-x-3 bg-gradient-to-r from-primary-50 to-accent-50 px-4 py-2 rounded-lg hover:shadow-md transition-all duration-200">
+                            <div class="w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                                <img src="<?php echo htmlspecialchars($patient['photo']); ?>" 
+                                     alt="Profile" 
+                                     class="w-full h-full object-cover">
+                            </div>
+                            <div class="text-left">
+                                <p class="text-sm font-medium text-neutral-dark"><?php echo htmlspecialchars($patient['name']); ?></p>
+                                <p class="text-xs text-secondary">Patient</p>
+                            </div>
+                            <i class="fas fa-chevron-down text-primary-500 text-xs"></i>
+                        </button>
+
+                        <!-- Dropdown Menu -->
+                        <div id="patientMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-primary-100 hidden z-50">
+                            <div class="py-1">
+                                <a href="#" onclick="openSettingsModal()" class="flex items-center px-4 py-2 text-sm text-neutral-dark hover:bg-primary-50 transition-colors duration-200">
+                                    <i class="fas fa-cog text-primary-500 mr-2"></i>
+                                    Settings
+                                </a>
+                                <div class="border-t border-primary-100 my-1"></div>
+                                <a href="logout.php" class="flex items-center px-4 py-2 text-sm text-danger hover:bg-danger-light transition-colors duration-200">
+                                    <i class="fas fa-sign-out-alt text-danger mr-2"></i>
                         Logout
                     </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </header>
 
+    <!-- Mobile Navigation -->
+    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-primary-100 z-40">
+        <nav class="flex justify-around items-center h-16">
+            <a href="#statistics" class="mobile-nav-link flex flex-col items-center justify-center w-full h-full text-neutral-dark hover:text-primary-500 transition-all duration-200">
+                <i class="fas fa-chart-line text-lg"></i>
+                <span class="text-xs mt-1">Statistics</span>
+                <span class="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-primary-500 to-accent-300"></span>
+            </a>
+            <a href="#appointments" class="mobile-nav-link flex flex-col items-center justify-center w-full h-full text-neutral-dark hover:text-primary-500 transition-all duration-200">
+                <i class="fas fa-calendar-check text-lg"></i>
+                <span class="text-xs mt-1">Appointments</span>
+                <span class="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-primary-500 to-accent-300"></span>
+            </a>
+        </nav>
+    </div>
+
     <main class="container mx-auto px-6 py-8">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Add IDs to the sections for navigation -->
+        <div class="grid grid-cols-1 md:grid-cols-4">
             <!-- Profile Card -->
             <div class="md:col-span-1">
-                <div class="bg-gradient-to-br from-primary-50 to-accent-100 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 h-full flex flex-col justify-between">
-                    <div class="text-center mb-6">
+                <div class="bg-gradient-to-br from-primary-50 to-accent-100 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-4 h-full flex flex-col justify-between">
+                    <!-- Desktop View -->
+                    <div class="hidden md:block text-center">
                         <img src="<?php echo htmlspecialchars($patient['photo']); ?>" 
                              alt="Profile Photo" 
-                             class="w-32 h-32 rounded-full mx-auto object-cover border-4 border-white shadow-md">
-                        <h2 class="text-xl font-bold mt-4 text-neutral-dark"><?php echo htmlspecialchars($patient['name']); ?></h2>
-                        <p class="text-secondary text-sm">Patient ID: <?php echo htmlspecialchars($patient['id']); ?></p>
-                        <button onclick="openEditProfileModal()" class="mt-3 bg-gradient-to-r from-primary-500 to-accent-300 text-white px-4 py-1 rounded-lg text-sm hover:scale-105 transition-all duration-200">
+                             class="w-24 h-24 rounded-full mx-auto object-cover border-4 border-white shadow-md">
+                        <h2 class="text-lg font-bold mt-3 text-neutral-dark"><?php echo htmlspecialchars($patient['name']); ?></h2>
+                        <p class="text-secondary text-xs">Patient ID: <?php echo htmlspecialchars($patient['id']); ?></p>
+                        <button onclick="openEditProfileModal()" class="mt-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white px-3 py-1 rounded-lg text-xs hover:scale-105 transition-all duration-200">
                             <i class="fas fa-edit mr-1"></i> Edit Profile
                         </button>
                     </div>
-                    <div class="space-y-4">
+
+                    <!-- Mobile View -->
+                    <div class="md:hidden flex items-center space-x-4 mb-4">
+                        <img src="<?php echo htmlspecialchars($patient['photo']); ?>" 
+                             alt="Profile Photo" 
+                             class="w-16 h-16 rounded-full object-cover border-4 border-white shadow-md">
+                        <div>
+                            <h2 class="text-base font-bold text-neutral-dark"><?php echo htmlspecialchars($patient['name']); ?></h2>
+                            <p class="text-secondary text-xs">Patient ID: <?php echo htmlspecialchars($patient['id']); ?></p>
+                            <button onclick="openEditProfileModal()" class="mt-1 bg-gradient-to-r from-primary-500 to-accent-300 text-white px-2 py-0.5 rounded-lg text-xs hover:scale-105 transition-all duration-200">
+                                <i class="fas fa-edit mr-1"></i> Edit Profile
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
                         <div class="flex items-center">
                             <i class="fas fa-envelope text-primary-500 mr-2"></i>
                             <div>
-                                <label class="block text-sm font-medium text-secondary">Email</label>
-                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['email']); ?></p>
+                                <label class="block text-xs font-medium text-secondary">Email</label>
+                                <p class="text-neutral-dark text-xs"><?php echo htmlspecialchars($patient['email']); ?></p>
                             </div>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-phone text-primary-500 mr-2"></i>
                             <div>
-                                <label class="block text-sm font-medium text-secondary">Phone</label>
-                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['phone']); ?></p>
+                                <label class="block text-xs font-medium text-secondary">Phone</label>
+                                <p class="text-neutral-dark text-xs"><?php echo htmlspecialchars($patient['phone']); ?></p>
                             </div>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-map-marker-alt text-primary-500 mr-2"></i>
                             <div>
-                                <label class="block text-sm font-medium text-secondary">Address</label>
-                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['address']); ?></p>
+                                <label class="block text-xs font-medium text-secondary">Address</label>
+                                <p class="text-neutral-dark text-xs"><?php echo htmlspecialchars($patient['address']); ?></p>
                             </div>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-birthday-cake text-primary-500 mr-2"></i>
                             <div>
-                                <label class="block text-sm font-medium text-secondary">Age</label>
-                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['age']); ?> years old</p>
+                                <label class="block text-xs font-medium text-secondary">Age</label>
+                                <p class="text-neutral-dark text-xs"><?php echo htmlspecialchars($patient['age']); ?> years old</p>
                             </div>
                         </div>
                         <div class="flex items-center">
                             <i class="fas fa-venus-mars text-primary-500 mr-2"></i>
                             <div>
-                                <label class="block text-sm font-medium text-secondary">Gender</label>
-                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['gender']); ?></p>
+                                <label class="block text-xs font-medium text-secondary">Gender</label>
+                                <p class="text-neutral-dark text-xs"><?php echo htmlspecialchars($patient['gender']); ?></p>
                             </div>
                         </div>
                     </div>
@@ -266,7 +379,7 @@ while ($current <= $end) {
             </div>
 
             <!-- Statistics Card -->
-            <div class="md:col-span-2">
+            <div id="statistics" class="md:col-span-3">
                 <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 h-full">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                         <h2 class="text-base font-medium text-neutral-dark">Patient Statistics</h2>
@@ -332,13 +445,20 @@ while ($current <= $end) {
             </div>
 
             <!-- Appointments -->
-            <div class="md:col-span-3 mt-6">
+            <div id="appointments" class="md:col-span-4 mt-6">
                 <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-base font-medium text-neutral-dark">My Appointments</h2>
+                        <div class="flex items-center space-x-4">
+                            <div class="relative">
+                                <input type="text" id="appointmentSearch" placeholder="Search appointments..." 
+                                       class="block w-full rounded-lg border border-primary-100 bg-white px-4 py-2 text-sm text-neutral-dark focus:border-primary-500 focus:ring-2 focus:ring-primary-500">
+                                <i class="fas fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-secondary"></i>
+                            </div>
                         <button onclick="openAppointmentModal()" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-4 py-2 rounded-lg text-sm hover:scale-105 transition-all duration-200">
-                            Book New Appointment
+                                <i class="fas fa-plus mr-1"></i> Book New Appointment
                         </button>
+                        </div>
                     </div>
                     <!-- Desktop View: Table -->
                     <div class="hidden sm:block overflow-x-auto">
@@ -347,22 +467,30 @@ while ($current <= $end) {
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Doctor</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Position</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Service</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Date</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Time</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-primary-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-primary-100">
                                 <?php if (empty($appointments)): ?>
-                                    <tr><td colspan="5" class="text-secondary text-center py-4">No appointments found.</td></tr>
+                                    <tr><td colspan="7" class="text-secondary text-center py-4">No appointments found.</td></tr>
                                 <?php else: ?>
                                     <?php foreach ($appointments as $appointment): ?>
-                                        <tr class="hover:bg-primary-50 transition-all">
+                                        <tr class="hover:bg-primary-50 transition-all appointment-row" 
+                                            data-doctor="<?php echo htmlspecialchars($appointment['doctor_name']); ?>"
+                                            data-service="<?php echo htmlspecialchars($appointment['service_name']); ?>"
+                                            data-status="<?php echo htmlspecialchars($appointment['status']); ?>">
                                             <td class="px-4 py-3 text-neutral-dark text-sm font-medium">
                                                 Dr. <?php echo htmlspecialchars($appointment['doctor_name']); ?>
                                             </td>
                                             <td class="px-4 py-3 text-secondary text-sm">
                                                 <?php echo htmlspecialchars($appointment['doctor_position'] ?? 'N/A'); ?>
+                                            </td>
+                                            <td class="px-4 py-3 text-secondary text-sm">
+                                                <?php echo htmlspecialchars($appointment['service_name']); ?>
                                             </td>
                                             <td class="px-4 py-3 text-secondary text-sm">
                                                 <i class="far fa-calendar-alt mr-1"></i><?php echo date('F j, Y', strtotime($appointment['appointment_date'])); ?>
@@ -393,12 +521,77 @@ while ($current <= $end) {
                                                     <?php echo ucfirst(htmlspecialchars($appointment['status'])); ?>
                                                 </span>
                                             </td>
+                                            <td class="px-4 py-3 text-sm">
+                                                <div class="flex items-center space-x-2">
+                                                    <?php if ($appointment['status'] !== 'Completed' && $appointment['status'] !== 'Cancelled'): ?>
+                                                        <button onclick="openRescheduleModal(<?php echo $appointment['id']; ?>)" 
+                                                                class="inline-flex items-center px-3 py-1.5 border border-primary-100 text-xs font-medium rounded-lg text-primary-500 bg-white hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200">
+                                                            <i class="fas fa-calendar-alt mr-1.5"></i>
+                                                            Re-schedule
+                                                        </button>
+                                                        <button onclick="updateAppointmentStatus(<?php echo $appointment['id']; ?>, 'Cancelled')" 
+                                                                class="inline-flex items-center px-3 py-1.5 border border-red-100 text-xs font-medium rounded-lg text-red-500 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200">
+                                                            <i class="fas fa-times mr-1.5"></i>
+                                                            Cancel
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </tbody>
                         </table>
+                        
+                        <!-- Pagination -->
+                        <?php if ($total_pages > 1): ?>
+                        <div class="flex items-center justify-between border-t border-primary-100 bg-white px-4 py-3 sm:px-6 mt-4">
+                            <div class="flex flex-1 justify-between sm:hidden">
+                                <?php if ($current_page > 1): ?>
+                                    <a href="?page=<?php echo $current_page - 1; ?>#appointments" class="relative inline-flex items-center rounded-md border border-primary-100 bg-white px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-primary-50">
+                                        Previous
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ($current_page < $total_pages): ?>
+                                    <a href="?page=<?php echo $current_page + 1; ?>#appointments" class="relative ml-3 inline-flex items-center rounded-md border border-primary-100 bg-white px-4 py-2 text-sm font-medium text-neutral-dark hover:bg-primary-50">
+                                        Next
+                                    </a>
+                                <?php endif; ?>
                     </div>
+                            <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-sm text-secondary">
+                                        Showing <span class="font-medium"><?php echo $offset + 1; ?></span> to 
+                                        <span class="font-medium"><?php echo min($offset + $items_per_page, $total_appointments); ?></span> of 
+                                        <span class="font-medium"><?php echo $total_appointments; ?></span> results
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                        <?php if ($current_page > 1): ?>
+                                            <a href="?page=<?php echo $current_page - 1; ?>#appointments" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-neutral-dark ring-1 ring-inset ring-primary-100 hover:bg-primary-50 focus:z-20 focus:outline-offset-0">
+                                                <span class="sr-only">Previous</span>
+                                                <i class="fas fa-chevron-left text-xs"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                        
+                                        <span class="relative inline-flex items-center px-4 py-2 text-sm font-medium bg-primary-500 text-white ring-1 ring-inset ring-primary-100 focus:z-20 focus:outline-offset-0">
+                                            <?php echo $current_page; ?>
+                                        </span>
+                                        
+                                        <?php if ($current_page < $total_pages): ?>
+                                            <a href="?page=<?php echo $current_page + 1; ?>#appointments" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-neutral-dark ring-1 ring-inset ring-primary-100 hover:bg-primary-50 focus:z-20 focus:outline-offset-0">
+                                                <span class="sr-only">Next</span>
+                                                <i class="fas fa-chevron-right text-xs"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+
                     <!-- Mobile View: Cards -->
                     <div class="block sm:hidden space-y-4">
                         <?php if (empty($appointments)): ?>
@@ -410,6 +603,7 @@ while ($current <= $end) {
                                         <div>
                                             <p class="text-sm font-medium text-neutral-dark">Dr. <?php echo htmlspecialchars($appointment['doctor_name']); ?></p>
                                             <p class="text-xs text-secondary"><?php echo htmlspecialchars($appointment['doctor_position'] ?? 'N/A'); ?></p>
+                                            <p class="text-xs text-secondary mt-1"><?php echo htmlspecialchars($appointment['service_name']); ?></p>
                                         </div>
                                         <span class="px-3 py-1 rounded-full text-xs font-medium
                                                     <?php
@@ -433,7 +627,7 @@ while ($current <= $end) {
                                             <?php echo ucfirst(htmlspecialchars($appointment['status'])); ?>
                                         </span>
                                     </div>
-                                    <div class="mt-2">
+                                    <div class="mt-2 space-y-1">
                                         <p class="text-xs text-secondary">
                                             <i class="far fa-calendar-alt mr-1"></i><?php echo date('F j, Y', strtotime($appointment['appointment_date'])); ?>
                                         </p>
@@ -441,8 +635,48 @@ while ($current <= $end) {
                                             <i class="far fa-clock mr-1"></i><?php echo date('g:i A', strtotime($appointment['appointment_time'])); ?>
                                         </p>
                                     </div>
+                                    <?php if ($appointment['status'] !== 'Completed' && $appointment['status'] !== 'Cancelled'): ?>
+                                        <div class="mt-3 flex space-x-2">
+                                            <button onclick="openRescheduleModal(<?php echo $appointment['id']; ?>)" 
+                                                    class="flex-1 inline-flex items-center justify-center px-3 py-1.5 border border-primary-100 text-xs font-medium rounded-lg text-primary-500 bg-white hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200">
+                                                <i class="fas fa-calendar-alt mr-1.5"></i>
+                                                Re-schedule
+                                            </button>
+                                            <button onclick="updateAppointmentStatus(<?php echo $appointment['id']; ?>, 'Cancelled')" 
+                                                    class="flex-1 inline-flex items-center justify-center px-3 py-1.5 border border-red-100 text-xs font-medium rounded-lg text-red-500 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200">
+                                                <i class="fas fa-times mr-1.5"></i>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
+                            
+                            <!-- Mobile Pagination -->
+                            <?php if ($total_pages > 1): ?>
+                            <div class="flex items-center justify-between mt-4">
+                                <div class="flex-1 flex justify-between">
+                                    <?php if ($current_page > 1): ?>
+                                        <a href="?page=<?php echo $current_page - 1; ?>#appointments" class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-neutral-dark bg-white border border-primary-100 rounded-md hover:bg-primary-50">
+                                            <i class="fas fa-chevron-left mr-1 text-xs"></i>
+                                            Previous
+                                        </a>
+                                    <?php endif; ?>
+                                    <span class="relative inline-flex items-center px-4 py-2 text-sm font-medium bg-primary-500 text-white border border-primary-100 rounded-md">
+                                        <?php echo $current_page; ?>
+                                    </span>
+                                    <?php if ($current_page < $total_pages): ?>
+                                        <a href="?page=<?php echo $current_page + 1; ?>#appointments" class="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium text-neutral-dark bg-white border border-primary-100 rounded-md hover:bg-primary-50">
+                                            Next
+                                            <i class="fas fa-chevron-right ml-1 text-xs"></i>
+                                        </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                            <div class="text-center text-sm text-secondary mt-2">
+                                Page <?php echo $current_page; ?> of <?php echo $total_pages; ?>
+                            </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -549,6 +783,166 @@ while ($current <= $end) {
                         <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg text-sm hover:scale-105 transition-all duration-200">Schedule</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-neutral-dark bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-6 border w-full max-w-4xl shadow-lg rounded-xl bg-white border-primary-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-medium text-neutral-dark">Settings</h3>
+                <button onclick="closeSettingsModal()" class="text-neutral-dark hover:text-primary-500 transition-colors duration-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Profile Information -->
+                <div class="space-y-4">
+                    <h4 class="text-lg font-medium text-neutral-dark mb-4">Profile Information</h4>
+                    <div class="flex items-center space-x-4">
+                        <img src="<?php echo htmlspecialchars($patient['photo']); ?>" 
+                             alt="Profile Photo" 
+                             class="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md">
+                        <div>
+                            <h5 class="text-base font-medium text-neutral-dark"><?php echo htmlspecialchars($patient['name']); ?></h5>
+                            <p class="text-sm text-secondary">Patient ID: <?php echo htmlspecialchars($patient['id']); ?></p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope text-primary-500 mr-2"></i>
+                            <div>
+                                <label class="block text-xs font-medium text-secondary">Email</label>
+                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['email']); ?></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-phone text-primary-500 mr-2"></i>
+                            <div>
+                                <label class="block text-xs font-medium text-secondary">Phone</label>
+                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['phone']); ?></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-map-marker-alt text-primary-500 mr-2"></i>
+                            <div>
+                                <label class="block text-xs font-medium text-secondary">Address</label>
+                                <p class="text-neutral-dark text-sm"><?php echo htmlspecialchars($patient['address']); ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Account Settings -->
+                <div class="space-y-4">
+                    <h4 class="text-lg font-medium text-neutral-dark mb-4">Account Settings</h4>
+                    <form id="settingsForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-neutral-dark">Change Password</label>
+                            <div class="mt-2 space-y-3">
+                                <div class="relative">
+                                    <input type="password" name="current_password" id="currentPassword" placeholder="Current Password" 
+                                           class="block w-full rounded-lg border-primary-100 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3 pr-10">
+                                    <button type="button" id="toggleCurrentPassword" class="absolute inset-y-0 right-0 flex items-center pr-3 text-primary-500 hover:text-primary-700">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="relative">
+                                    <input type="password" name="new_password" id="newPassword" placeholder="New Password" 
+                                           class="block w-full rounded-lg border-primary-100 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3 pr-10">
+                                    <button type="button" id="toggleNewPassword" class="absolute inset-y-0 right-0 flex items-center pr-3 text-primary-500 hover:text-primary-700">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="relative">
+                                    <input type="password" name="confirm_password" id="confirmPassword" placeholder="Confirm New Password" 
+                                           class="block w-full rounded-lg border-primary-100 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3 pr-10">
+                                    <button type="button" id="toggleConfirmPassword" class="absolute inset-y-0 right-0 flex items-center pr-3 text-primary-500 hover:text-primary-700">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 bg-neutral-light text-neutral-dark rounded-lg hover:bg-primary-50 transition-colors duration-200">
+                                Cancel
+                            </button>
+                            <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">
+                                <i class="fas fa-save mr-1.5"></i>Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification" class="fixed top-4 right-4 transform transition-transform duration-300 translate-x-full">
+        <div class="bg-white rounded-lg shadow-lg p-4 max-w-sm">
+            <div class="flex items-center">
+                <div id="notificationIcon" class="flex-shrink-0 mr-3">
+                    <i class="fas fa-check-circle text-success text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <p id="notificationMessage" class="text-sm font-medium text-neutral-dark"></p>
+                </div>
+                <button onclick="hideNotification()" class="ml-4 text-neutral-dark hover:text-primary-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reschedule Modal -->
+    <div class="modal fade" id="rescheduleModal" tabindex="-1" role="dialog" aria-labelledby="rescheduleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content bg-gradient-to-br from-primary-50 to-accent-100 border border-primary-100 rounded-xl shadow-lg">
+                <div class="modal-header border-b border-primary-100 px-6 py-4">
+                    <h5 class="modal-title text-lg font-medium text-neutral-dark" id="rescheduleModalLabel">Reschedule Appointment</h5>
+                    <button type="button" class="close text-neutral-dark hover:text-primary-500 transition-colors duration-200" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body px-6 py-4">
+                    <form id="rescheduleForm" class="space-y-4">
+                        <input type="hidden" id="rescheduleAppointmentId" name="appointment_id">
+                        <input type="hidden" id="reschedulePatientId" name="patient_id">
+                        <input type="hidden" id="rescheduleDoctorId" name="staff_id">
+                        <input type="hidden" id="rescheduleServiceId" name="service_id">
+                        
+                        <div>
+                            <label for="rescheduleDate" class="block text-sm font-medium text-neutral-dark mb-1">Date</label>
+                            <input type="date" class="form-control block w-full rounded-lg border-primary-100 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3" 
+                                   id="rescheduleDate" name="appointment_date" required>
+                        </div>
+                        
+                        <div>
+                            <label for="rescheduleTime" class="block text-sm font-medium text-neutral-dark mb-1">Time</label>
+                            <select class="form-control block w-full rounded-lg border-primary-100 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3" 
+                                    id="rescheduleTime" name="appointment_time" required>
+                                <option value="">Select a time slot</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label for="rescheduleRemarks" class="block text-sm font-medium text-neutral-dark mb-1">Remarks (Optional)</label>
+                            <textarea class="form-control block w-full rounded-lg border-primary-100 bg-white shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 text-sm py-2 px-3" 
+                                      id="rescheduleRemarks" name="remarks" rows="3"></textarea>
+                        </div>
+                        
+                        <div class="modal-footer border-t border-primary-100 px-6 py-4 mt-6 flex justify-end space-x-3">
+                            <button type="button" class="px-4 py-2 bg-white text-neutral-dark rounded-lg hover:bg-primary-50 border border-primary-100 transition-all duration-200" 
+                                    data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-lg hover:scale-105 transition-all duration-200">
+                                Reschedule
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -757,6 +1151,52 @@ while ($current <= $end) {
                     button.classList.add('bg-white', 'text-neutral-dark');
                 }
             });
+
+            // Patient Menu Toggle
+            const patientMenuTrigger = document.getElementById('patientMenuTrigger');
+            const patientMenu = document.getElementById('patientMenu');
+
+            if (patientMenuTrigger && patientMenu) {
+                patientMenuTrigger.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    patientMenu.classList.toggle('hidden');
+                    patientMenu.classList.toggle('show');
+                });
+
+                // Close the dropdown if the user clicks outside of it
+                document.addEventListener('click', function(event) {
+                    if (!patientMenuTrigger.contains(event.target) && !patientMenu.contains(event.target)) {
+                        patientMenu.classList.add('hidden');
+                        patientMenu.classList.remove('show');
+                    }
+                });
+            }
+
+            // Navigation Active State
+            function updateActiveNavLink() {
+                const sections = document.querySelectorAll('section[id]');
+                const navLinks = document.querySelectorAll('.nav-link, .mobile-nav-link');
+                
+                let currentSection = '';
+                
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    if (window.scrollY >= (sectionTop - sectionHeight / 3)) {
+                        currentSection = section.getAttribute('id');
+                    }
+                });
+                
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === currentSection) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+
+            window.addEventListener('scroll', updateActiveNavLink);
+            window.addEventListener('load', updateActiveNavLink);
         });
 
         // Profile Modal Functions
@@ -767,6 +1207,128 @@ while ($current <= $end) {
         function closeEditProfileModal() {
             document.getElementById('editProfileModal').classList.add('hidden');
         }
+
+        // Settings Modal Functions
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Password toggle functions
+        function togglePasswordVisibility(inputId, buttonId) {
+            const input = document.getElementById(inputId);
+            const button = document.getElementById(buttonId);
+            const icon = button.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Add event listeners for password toggles
+        document.getElementById('toggleCurrentPassword').addEventListener('click', () => togglePasswordVisibility('currentPassword', 'toggleCurrentPassword'));
+        document.getElementById('toggleNewPassword').addEventListener('click', () => togglePasswordVisibility('newPassword', 'toggleNewPassword'));
+        document.getElementById('toggleConfirmPassword').addEventListener('click', () => togglePasswordVisibility('confirmPassword', 'toggleConfirmPassword'));
+
+        // Notification functions
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationMessage = document.getElementById('notificationMessage');
+            const notificationIcon = document.getElementById('notificationIcon');
+            
+            notificationMessage.textContent = message;
+            
+            // Update icon based on type
+            const icon = notificationIcon.querySelector('i');
+            icon.className = '';
+            if (type === 'success') {
+                icon.className = 'fas fa-check-circle text-success text-xl';
+            } else {
+                icon.className = 'fas fa-exclamation-circle text-danger text-xl';
+            }
+            
+            // Show notification
+            notification.classList.remove('translate-x-full');
+            
+            // Hide after 3 seconds
+            setTimeout(hideNotification, 3000);
+        }
+
+        function hideNotification() {
+            const notification = document.getElementById('notification');
+            notification.classList.add('translate-x-full');
+        }
+
+        // Handle settings form submission
+        document.getElementById('settingsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            formData.append('patient_id', '<?php echo $_SESSION['patient_id']; ?>');
+            
+            // Show loading state
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Updating...';
+            
+            fetch('update_settings.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new TypeError("Response was not JSON");
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    closeSettingsModal();
+                    // Clear form
+                    this.reset();
+                } else {
+                    showNotification(data.message || 'Failed to update password', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while updating password. Please try again.', 'error');
+            })
+            .finally(() => {
+                // Reset button state
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            });
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('settingsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSettingsModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('settingsModal').classList.contains('hidden')) {
+                closeSettingsModal();
+            }
+        });
 
         // Appointment Modal Functions
         function openAppointmentModal() {
@@ -930,6 +1492,213 @@ while ($current <= $end) {
                 });
             });
         });
+
+        // Search functionality
+        document.getElementById('appointmentSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('.appointment-row');
+            
+            rows.forEach(row => {
+                const doctor = row.dataset.doctor.toLowerCase();
+                const service = row.dataset.service.toLowerCase();
+                const status = row.dataset.status.toLowerCase();
+                
+                if (doctor.includes(searchTerm) || 
+                    service.includes(searchTerm) || 
+                    status.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // Re-schedule Modal Functions
+        function openRescheduleModal(appointmentId) {
+            console.log('Opening reschedule modal for appointment:', appointmentId);
+            
+            // Reset form
+            $('#rescheduleForm')[0].reset();
+            $('#rescheduleAppointmentId').val(appointmentId);
+            
+            // Get appointment details
+            $.ajax({
+                url: 'schedule.php',
+                type: 'GET',
+                data: {
+                    action: 'get_appointment_details',
+                    id: appointmentId
+                },
+                success: function(response) {
+                    console.log('Appointment details:', response);
+                    if (response.success && response.appointment) {
+                        const appointment = response.appointment;
+                        
+                        // Set form values
+                        $('#reschedulePatientId').val(appointment.patient_id);
+                        $('#rescheduleDoctorId').val(appointment.doctor_id);
+                        $('#rescheduleServiceId').val(appointment.service_id);
+                        $('#rescheduleDate').val(appointment.appointment_date);
+                        $('#rescheduleRemarks').val(appointment.remarks || '');
+                        
+                        // Update time slots
+                        updateRescheduleTimeSlots();
+                        
+                        // Show modal using Bootstrap 5
+                        const rescheduleModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
+                        rescheduleModal.show();
+                    } else {
+                        alert(response.message || 'Error loading appointment details. Please try again.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', error);
+                    console.log('Response:', xhr.responseText);
+                    alert('Error loading appointment details. Please try again.');
+                }
+            });
+        }
+
+        function closeRescheduleModal() {
+            document.getElementById('rescheduleModal').classList.add('hidden');
+        }
+
+        function updateRescheduleTimeSlots() {
+            const date = $('#rescheduleDate').val();
+            const serviceId = $('#rescheduleServiceId').val();
+            const doctorId = $('#rescheduleDoctorId').val();
+            
+            if (!date) {
+                $('#rescheduleTime').html('<option value="">Please select a date</option>');
+                return;
+            }
+            
+            $('#rescheduleTime').html('<option value="">Loading time slots...</option>');
+            
+            $.ajax({
+                url: 'schedule.php',
+                type: 'GET',
+                data: {
+                    action: 'get_time_slots',
+                    date: date,
+                    service_id: serviceId,
+                    doctor_id: doctorId
+                },
+                success: function(response) {
+                    console.log('Time slots response:', response);
+                    if (response.success && response.slots) {
+                        let options = '<option value="">Select a time slot</option>';
+                        response.slots.forEach(slot => {
+                            options += `<option value="${slot}">${slot}</option>`;
+                        });
+                        $('#rescheduleTime').html(options);
+                    } else {
+                        console.error('Failed to get time slots:', response.message);
+                        $('#rescheduleTime').html('<option value="">No available time slots</option>');
+                        alert(response.message || 'Error loading time slots. Please try again.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', error);
+                    console.log('Response:', xhr.responseText);
+                    $('#rescheduleTime').html('<option value="">Error loading time slots</option>');
+                }
+            });
+        }
+
+        // Initialize reschedule form
+        $(document).ready(function() {
+            $('#rescheduleDate').attr('min', serverPHTDate);
+
+            $('#rescheduleDate').on('change', function() {
+                const selectedDate = $(this).val();
+                if (selectedDate < serverPHTDate) {
+                    alert('Cannot reschedule appointments for past dates. Please select today or a future date.');
+                    $(this).val(serverPHTDate);
+                    return false;
+                }
+                updateRescheduleTimeSlots();
+            });
+
+            // Handle reschedule form submission
+            $('#rescheduleForm').on('submit', function(e) {
+                e.preventDefault();
+                var formData = {
+                    action: 'add_appointment',
+                    appointment_id: $('#rescheduleAppointmentId').val(),
+                    patient_id: $('#reschedulePatientId').val(),
+                    staff_id: $('#rescheduleDoctorId').val(),
+                    service_id: $('#rescheduleServiceId').val(),
+                    appointment_date: $('#rescheduleDate').val(),
+                    appointment_time: $('#rescheduleTime').val(),
+                    remarks: $('#rescheduleRemarks').val()
+                };
+
+                $.ajax({
+                    url: 'schedule.php',
+                    type: 'POST',
+                    data: formData,
+                    success: function(response) {
+                        if (response.success) {
+                            alert(response.message);
+                            const rescheduleModal = bootstrap.Modal.getInstance(document.getElementById('rescheduleModal'));
+                            rescheduleModal.hide();
+                            location.reload();
+                        } else {
+                            alert(response.message || 'Error rescheduling appointment. Please try again.');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX Error:', error);
+                        console.log('Response:', xhr.responseText);
+                        alert('Error rescheduling appointment. Please try again.');
+                    }
+                });
+            });
+
+            // Add session check at the start of the page
+            $.ajax({
+                url: 'check_session.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    if (!response.active) {
+                        window.location.href = 'login.php';
+                    }
+                },
+                error: function() {
+                    window.location.href = 'login.php';
+                }
+            });
+        });
+
+        // Update appointment status
+        function updateAppointmentStatus(appointmentId, status) {
+            if (status === 'Cancelled') {
+                if (confirm('Are you sure you want to cancel this appointment?')) {
+                    $.ajax({
+                        url: 'schedule.php',
+                        type: 'POST',
+                        data: {
+                            action: 'update_status',
+                            id: appointmentId,
+                            status: status
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                window.location.reload();
+                            } else {
+                                alert(response.message || 'Error updating appointment status. Please try again.');
+                            }
+                        },
+                        error: function() {
+                            alert('Error updating appointment status. Please try again.');
+                        }
+                    });
+                }
+            }
+        }
     </script>
 
     <style>
@@ -953,6 +1722,56 @@ while ($current <= $end) {
         }
         .hover\:bg-primary-50:hover {
             background-color: #ccfbf1;
+        }
+        .nav-link {
+            position: relative;
+            padding: 0.5rem 0;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(to right, #14b8a6, #f59e0b);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        .nav-link.active {
+            color: #14b8a6;
+        }
+        .nav-link.active::after {
+            width: 100%;
+        }
+        .mobile-nav-link {
+            position: relative;
+        }
+        .mobile-nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(to right, #14b8a6, #f59e0b);
+            transition: width 0.3s ease;
+        }
+        .mobile-nav-link:hover::after {
+            width: 100%;
+        }
+        .mobile-nav-link.active {
+            color: #14b8a6;
+        }
+        .mobile-nav-link.active::after {
+            width: 100%;
+        }
+        @media (max-width: 768px) {
+            main {
+                padding-bottom: 5rem;
+            }
         }
     </style>
 </body>

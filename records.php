@@ -108,8 +108,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($_POST['action'] == 'add_credentials') {
             $patient_id = $_POST['patient_id'] ?? '';
             $username = htmlspecialchars(trim($_POST['username'] ?? ''));
-            $password = password_hash($_POST['password'] ?? '', PASSWORD_DEFAULT);
+            $password = $_POST['password'] ?? '';
             $status = 1;
+
+            // Validate password length
+            if (strlen($password) < 8) {
+                header("Location: index.php?page=records&action=show_credentials&patient_id=" . $patient_id . "&error=" . urlencode("Password must be at least 8 characters long."));
+                exit();
+            }
 
             try {
                 // Check for duplicate username
@@ -127,7 +133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
                     ':username' => $username,
-                    ':password' => $password,
+                    ':password' => password_hash($password, PASSWORD_DEFAULT),
                     ':patient_id' => $patient_id,
                     ':status' => $status
                 ]);
@@ -230,6 +236,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $username = htmlspecialchars(trim($_POST['username'] ?? ''));
             $patient_id = $_POST['patient_id'] ?? '';
             $password = $_POST['password'] ?? '';
+
+            // Validate password length if a new password is provided
+            if (!empty($password) && strlen($password) < 8) {
+                header("Location: index.php?page=records&error=" . urlencode("Password must be at least 8 characters long."));
+                exit();
+            }
 
             try {
                 $pdo->beginTransaction();

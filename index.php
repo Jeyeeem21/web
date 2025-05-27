@@ -28,6 +28,43 @@ $aboutContent = $stmt->fetch();
 // Get clinic details
 $stmt = $pdo->query("SELECT * FROM clinic_details ORDER BY created_at DESC LIMIT 1");
 $clinic = $stmt->fetch();
+
+session_start();
+
+// Check if user is logged in and is an admin
+if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
+    header("Location: login.php");
+    exit();
+}
+
+// Get admin details
+try {
+    $stmt = $pdo->prepare("SELECT s.name, s.role 
+                          FROM staff s 
+                          JOIN users u ON s.id = u.staff_id 
+                          WHERE u.id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $admin = $stmt->fetch();
+} catch (PDOException $e) {
+    error_log($e->getMessage());
+    $admin = ['name' => 'Admin', 'role' => 'admin'];
+}
+
+// Handle logout
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    // Log the logout action
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'N/A';
+    $stmt = $pdo->prepare("INSERT INTO user_logs (user_id, username, action, status, ip_address) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$_SESSION['user_id'], $_SESSION['username'], 'Logout', 'Success', $ip_address]);
+    
+    // Clear all session variables
+    session_unset();
+    // Destroy the session
+    session_destroy();
+    // Redirect to login page
+    header("Location: login.php");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -293,17 +330,17 @@ $clinic = $stmt->fetch();
             <div class="container mx-auto px-6 py-3 flex justify-between items-center">
                 <div class="flex items-center space-x-2">
                     <img src="<?php echo htmlspecialchars($clinic['logo']); ?>" alt="Clinic Logo" class="h-8 w-8 object-contain">
-                    <h1 class="text-lg font-heading font-bold text-primary-500"><?php echo htmlspecialchars($clinic['clinic_name']); ?></h1>
+                    <h1 class="text-lg sm:text-xl font-heading font-bold bg-gradient-to-r from-primary-500 to-accent-300 bg-clip-text text-transparent"><?php echo htmlspecialchars($clinic['clinic_name']); ?></h1>
                 </div>
                 <!-- Mobile Admin Menu -->
                 <div class="md:hidden relative">
                     <button id="mobileAdminMenuButton" class="flex items-center space-x-2 focus:outline-none">
                         <img class="h-8 w-8 rounded-full object-cover" src="https://randomuser.me/api/portraits/men/1.jpg" alt="Admin profile">
-                        <span class="text-sm font-heading font-bold text-primary-500">Dr. Smith</span>
+                        <span class="text-sm font-heading font-bold text-primary-500"><?php echo htmlspecialchars($admin['name']); ?></span>
                     </button>
                     <div id="mobileAdminMenu" class="hidden absolute right-0 mt-2 w-48 bg-white border border-primary-100 rounded-md shadow-lg z-50">
                         <div class="px-4 py-2 text-sm font-heading font-bold text-primary-500">Dr. Smith</div>
-                        <a href="#" class="block px-4 py-2 text-xs text-primary-500 hover:text-primary-600 hover:bg-primary-50">Logout</a>
+                        <a href="?action=logout" class="block px-4 py-2 text-xs text-primary-500 hover:text-primary-600 hover:bg-primary-50">Logout</a>
                     </div>
                 </div>
             </div>
@@ -336,7 +373,7 @@ $clinic = $stmt->fetch();
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                <span class="nav-text font-sans">Records</span>
+                                <span class="nav-text font-sans">Patient</span>
                             </div>
                         </a>
                         <a href="index.php?page=schedule" class="nav-link <?php echo $page === 'schedule' ? 'active' : ''; ?>">
@@ -372,8 +409,8 @@ $clinic = $stmt->fetch();
                             <img class="h-8 w-8 rounded-full object-cover" src="https://randomuser.me/api/portraits/men/1.jpg" alt="Admin profile">
                         </div>
                         <div class="ml-3">
-                            <p class="text-sm font-heading font-bold text-primary-500 nav-text">Dr. Smith</p>
-                            <a href="#" class="text-xs text-primary-500 hover:text-primary-600 nav-text">Logout</a>
+                            <p class="text-sm font-heading font-bold text-primary-500 nav-text"><?php echo htmlspecialchars($admin['name']); ?></p>
+                            <a href="?action=logout" class="text-xs text-primary-500 hover:text-primary-600 nav-text">Logout</a>
                         </div>
                     </div>
                 </div>
@@ -398,7 +435,7 @@ $clinic = $stmt->fetch();
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span class="text-xs mt-1 font-sans">Records</span>
+                    <span class="text-xs mt-1 font-sans">Patient</span>
                 </a>
                 <a href="index.php?page=schedule" class="mobile-nav-link flex flex-col items-center justify-center <?php echo $page === 'schedule' ? 'active text-white' : 'text-secondary'; ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

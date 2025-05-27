@@ -1,101 +1,95 @@
 <?php
 session_start();
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once 'config/db.php';
 
-// Check if user is logged in and is a patient
-if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'patient') {
-    header("Location: login.php");
-    exit();
+// Debug session information
+error_log("Session data: " . print_r($_SESSION, true));
+
+// Check if user is logged in and is a doctor
+if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'doctor') {
+    error_log("Unauthorized access attempt. Session role: " . ($_SESSION['user_role'] ?? 'not set'));
+    echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
+    exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $patient_id = $_POST['patient_id'];
-    $email = $_POST['email'];
-    $phone = $_POST['phone'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_profile') {
+    // Debug POST data
+    error_log("POST data: " . print_r($_POST, true));
+    error_log("FILES data: " . print_r($_FILES, true));
+
+    $staff_id = $_POST['staff_id'];
+    $name = $_POST['name'];
+    $gmail = $_POST['email'];
+    $contact = $_POST['phone'];
     $address = $_POST['address'];
+    $gender = $_POST['gender'];
     
-    // Validate input
-    if (empty($email) || empty($phone) || empty($address)) {
-        $_SESSION['error'] = "All fields are required.";
-        header("Location: patient_dashboard.php");
-        exit();
-    }
-
-    // Check if email is already taken by another patient
-    $stmt = $pdo->prepare("SELECT id FROM patients WHERE email = ? AND id != ?");
-    $stmt->execute([$email, $patient_id]);
-    if ($stmt->rowCount() > 0) {
-        $_SESSION['error'] = "Email is already taken by another patient.";
-        header("Location: patient_dashboard.php");
-        exit();
-    }
-
-    // Handle photo upload
-    $photo_path = null;
-    if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        $max_size = 5 * 1024 * 1024; // 5MB
-
-        if (!in_array($_FILES['photo']['type'], $allowed_types)) {
-            $_SESSION['error'] = "Invalid file type. Only JPG, PNG and GIF are allowed.";
-            header("Location: patient_dashboard.php");
-            exit();
-        }
-
-        if ($_FILES['photo']['size'] > $max_size) {
-            $_SESSION['error'] = "File is too large. Maximum size is 5MB.";
-            header("Location: patient_dashboard.php");
-            exit();
-        }
-
-        $upload_dir = 'uploads/patients/';
-        if (!file_exists($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-
-        $file_extension = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
-        $file_name = uniqid('patient_') . '.' . $file_extension;
-        $target_path = $upload_dir . $file_name;
-
-        if (move_uploaded_file($_FILES['photo']['tmp_name'], $target_path)) {
-            $photo_path = $target_path;
-        }
-    }
-
     try {
-        // Start transaction
         $pdo->beginTransaction();
 
-        // Update patient information
-        $sql = "UPDATE patients SET email = ?, phone = ?, address = ?";
-        $params = [$email, $phone, $address];
+        // Update staff information
+        $stmt = $pdo->prepare("
+            UPDATE staff 
+            SET name = ?, gmail = ?, contact = ?, address = ?, gender = ?
+            WHERE id = ?
+        ");
+        $stmt->execute([$name, $gmail, $contact, $address, $gender, $staff_id]);
 
-        if ($photo_path) {
-            $sql .= ", photo = ?";
-            $params[] = $photo_path;
+        // Handle photo upload if provided
+        if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+            $photo = $_FILES['photo'];
+            $photo_name = time() . '_' . $photo['name'];
+            $photo_path = 'uploads/staff/' . $photo_name;
+            
+            if (move_uploaded_file($photo['tmp_name'], $photo_path)) {
+                $stmt = $pdo->prepare("UPDATE staff SET photo = ? WHERE id = ?");
+                $stmt->execute([$photo_path, $staff_id]);
+            }
         }
 
-        $sql .= " WHERE id = ?";
-        $params[] = $patient_id;
+        // Handle schedule update
+        if (isset($_POST['rest_day']) && !empty($_POST['rest_day'])) {
+            $rest_day = $_POST['rest_day'];
+            $start_time = $_POST['start_time'] . ':00';
+            $end_time = $_POST['end_time'] . ':00';
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+            // Check if schedule already exists
+            $stmt = $pdo->prepare("SELECT id FROM doctor_schedule WHERE doctor_id = ?");
+            $stmt->execute([$staff_id]);
+            $existing_schedule = $stmt->fetch();
 
-        // Update user email if it exists
-        $stmt = $pdo->prepare("UPDATE users SET email = ? WHERE patient_id = ?");
-        $stmt->execute([$email, $patient_id]);
+            if ($existing_schedule) {
+                // Update existing schedule
+                $stmt = $pdo->prepare("
+                    UPDATE doctor_schedule 
+                    SET rest_day = ?, start_time = ?, end_time = ?
+                    WHERE doctor_id = ?
+                ");
+                $stmt->execute([$rest_day, $start_time, $end_time, $staff_id]);
+            } else {
+                // Insert new schedule
+                $stmt = $pdo->prepare("
+                    INSERT INTO doctor_schedule (doctor_id, rest_day, start_time, end_time, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ");
+                $stmt->execute([$staff_id, $rest_day, $start_time, $end_time]);
+            }
+        }
 
         $pdo->commit();
-        $_SESSION['success'] = "Profile updated successfully.";
+        echo json_encode(['success' => true, 'message' => 'Profile updated successfully']);
     } catch (Exception $e) {
         $pdo->rollBack();
-        $_SESSION['error'] = "An error occurred while updating your profile.";
+        error_log("Error updating profile: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Error updating profile: ' . $e->getMessage()]);
     }
-
-    header("Location: patient_dashboard.php");
-    exit();
+    exit;
 } else {
-    header("Location: patient_dashboard.php");
-    exit();
+    error_log("Invalid request method or missing action. Method: " . $_SERVER['REQUEST_METHOD']);
+    error_log("POST data: " . print_r($_POST, true));
+    echo json_encode(['success' => false, 'message' => 'Invalid request']);
 }
 ?> 
