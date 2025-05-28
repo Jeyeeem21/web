@@ -17,60 +17,119 @@ error_reporting(E_ALL);
 // Handle AJAX requests first to avoid HTML output
 if (isset($_GET['action'])) {
     // Delete (soft delete) doctor position
-    if ($_GET['action'] == 'delete_doctor' && isset($_GET['id'])) {
-        try {
-            $id = $_GET['id'];
-            $sql = "UPDATE doctor_position SET status = 0 WHERE id = :id";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([':id' => $id]);
-            
-            // Clean output buffer and set JSON header
-            ob_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Position deleted successfully']);
-            exit();
-        } catch (PDOException $e) {
-            // Log error and return JSON error response
-            error_log("Delete doctor position error: " . $e->getMessage());
-            ob_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Error deleting position: ' . $e->getMessage()]);
-            exit();
-        }
+  if (isset($_GET['action']) && $_GET['action'] == 'delete_doctor' && isset($_GET['id'])) {
+    // Clear all output buffers immediately
+    while (ob_get_level()) {
+        ob_end_clean();
     }
+
+    // Set headers
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
+
+    // Validate ID
+    $id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+    if ($id === false) {
+        echo json_encode(['success' => false, 'message' => 'Invalid position ID']);
+        exit;
+    }
+
+    try {
+        // Load database after clearing buffers
+        require_once 'config/db.php';
+        if (!$pdo) {
+            throw new Exception('Database connection not established');
+        }
+
+        // Check if position exists and is active
+        $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM doctor_position WHERE id = :id AND status = 1");
+        $check_stmt->execute(['id' => $id]);
+        if ($check_stmt->fetchColumn() == 0) {
+            echo json_encode(['success' => false, 'message' => 'Position not found or already inactive']);
+            exit;
+        }
+
+        // Soft delete
+        $stmt = $pdo->prepare("UPDATE doctor_position SET status = 0 WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('Failed to update position');
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Position deleted successfully']);
+    } catch (Exception $e) {
+        error_log("Delete doctor position error: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Error deleting position: ' . $e->getMessage()]);
+    }
+    exit;
+}
 
     // Delete (soft delete) service
-    if ($_GET['action'] == 'delete_service' && isset($_GET['id'])) {
-        try {
-            $id = $_GET['id'];
-            // Get service picture to delete
-            $stmt = $pdo->prepare("SELECT service_picture FROM services WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $service = $stmt->fetch();
-            
-            // Delete image file if it exists
-            if (!empty($service['service_picture']) && file_exists($service['service_picture'])) {
-                unlink($service['service_picture']);
-            }
-
-            $sql = "UPDATE services SET status = 0 WHERE id = :id";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([':id' => $id]);
-
-            // Clean output buffer and set JSON header
-            ob_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Service deleted successfully']);
-            exit();
-        } catch (PDOException $e) {
-            // Log error and return JSON error response
-            error_log("Delete service error: " . $e->getMessage());
-            ob_clean();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Error deleting service: ' . $e->getMessage()]);
-            exit();
-        }
+   if (isset($_GET['action']) && $_GET['action'] === 'delete_service' && isset($_GET['id'])) {
+    // Clear all output buffers immediately
+    while (ob_get_level()) {
+        ob_end_clean();
     }
+
+    // Set headers
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
+
+    // Validate ID
+    $id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+    if ($id === false) {
+        echo json_encode(['success' => false, 'message' => 'Invalid service ID']);
+        exit;
+    }
+
+    try {
+        // Load database
+        require_once 'config/db.php';
+        if (!$pdo) {
+            throw new Exception('Database connection not established');
+        }
+
+        // Begin transaction
+        $pdo->beginTransaction();
+
+        // Check if service exists and is active
+        $stmt = $pdo->prepare("SELECT service_picture FROM services WHERE id = :id AND status = 1");
+        $stmt->execute(['id' => $id]);
+        $service = $stmt->fetch();
+
+        if (!$service) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Service not found or already inactive']);
+            exit;
+        }
+
+        // Delete image file if it exists
+        if (!empty($service['service_picture']) && file_exists($service['service_picture'])) {
+            if (!unlink($service['service_picture'])) {
+                throw new Exception('Failed to delete service image');
+            }
+        }
+
+        // Soft delete service
+        $stmt = $pdo->prepare("UPDATE services SET status = 0 WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('Failed to update service');
+        }
+
+        $pdo->commit();
+        echo json_encode(['success' => true, 'message' => 'Service deleted successfully']);
+    } catch (Exception $e) {
+        if (isset($pdo)) {
+            $pdo->rollBack();
+        }
+        error_log("Delete service error: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Error deleting service: ' . $e->getMessage()]);
+    }
+    exit;
+}
 }
 
 // Process form submission for adding/editing doctor positions and services
@@ -862,17 +921,53 @@ function validateDoctorForm() {
 
 function deletePosition(id) {
     if (confirm('Are you sure you want to delete this position?')) {
-        fetch(`index.php?page=doctor_position_management&action=delete_doctor&id=${id}`)
-            .then(response => response.json())
-            .then(data => {
+        const button = document.querySelector(`#position-row-${id} button[onclick="deletePosition(${id})"]`);
+        const originalButtonHTML = button ? button.innerHTML : '';
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.3"/><path fill="currentColor" d="M4 12a8 8 0 018-8v2a6 6 0 00-6 6h2z"/></svg>';
+        }
+
+        fetch(`index.php?page=doctor_position_management&action=delete_doctor&id=${id}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+            return response.text();
+        })
+        .then(text => {
+            try {
+                const data = JSON.parse(text);
                 if (data.success) {
-                    document.getElementById(`position-row-${id}`).remove();
-                    window.location.reload(); // Reload the page after deletion
+                    alert('Position deleted successfully');
+                    const row = document.getElementById(`position-row-${id}`);
+                    if (row) row.remove();
+                    window.location.reload();
+                } else {
+                    alert('Error deleting position: ' + (data.message || 'Unknown error'));
                 }
-            });
+            } catch (e) {
+                console.error('Failed to parse JSON. Raw response:', text);
+                console.error('Parse error:', e);
+                alert('Error deleting position: Invalid server response');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert('Error deleting position: ' + error.message);
+        })
+        .finally(() => {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalButtonHTML;
+            }
+        });
     }
 }
-
 /* Optional: Improved deletePosition with error handling
 function deletePosition(id) {
     if (confirm('Are you sure you want to delete this position?')) {
@@ -953,14 +1048,51 @@ function closePriceModal() {
 
 function deleteService(id) {
     if (confirm('Are you sure you want to delete this service?')) {
-        fetch(`index.php?page=doctor_position_management&action=delete_service&id=${id}`)
-            .then(response => response.json())
-            .then(data => {
+        const button = document.querySelector(`#service-row-${id} button[onclick="deleteService(${id})"]`);
+        const originalButtonHTML = button ? button.innerHTML : '';
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.3"/><path fill="currentColor" d="M4 12a8 8 0 018-8v2a6 6 0 00-6 6h2z"/></svg>';
+        }
+
+        fetch(`index.php?page=doctor_position_management&action=delete_service&id=${id}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+            return response.text();
+        })
+        .then(text => {
+            try {
+                const data = JSON.parse(text);
                 if (data.success) {
-                    document.getElementById(`service-row-${id}`).remove();
-                    window.location.reload(); // Reload the page after deletion
+                    alert('Service deleted successfully');
+                    const row = document.getElementById(`service-row-${id}`);
+                    if (row) row.remove();
+                    window.location.reload();
+                } else {
+                    alert('Error deleting service: ' + (data.message || 'Unknown error'));
                 }
-            });
+            } catch (e) {
+                console.error('Failed to parse JSON. Raw response:', text);
+                console.error('Parse error:', e);
+                alert('Error deleting service: Invalid server response');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert('Error deleting service: ' + error.message);
+        })
+        .finally(() => {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalButtonHTML;
+            }
+        });
     }
 }
 

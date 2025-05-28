@@ -459,20 +459,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 // Delete staff
+// Delete staff
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
-    $id = $_GET['id'];
+    // Prevent any output before JSON
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
+    // Set headers
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
+
+    // Validate ID
+    $id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+    if ($id === false) {
+        echo json_encode(['success' => false, 'error' => 'Invalid staff ID']);
+        exit;
+    }
+
     try {
+        // Ensure database connection
+        require_once 'config/db.php';
+        if (!$pdo) {
+            throw new Exception('Database connection not established');
+        }
+
         $pdo->beginTransaction();
 
-        // Check if staff has an associated user account
+        // Check for active user accounts
         $check_user_sql = "SELECT id FROM users WHERE staff_id = :staff_id AND status = 1";
         $check_user_stmt = $pdo->prepare($check_user_sql);
         $check_user_stmt->execute([':staff_id' => $id]);
         if ($check_user_stmt->fetchColumn() > 0) {
-            throw new Exception("Cannot delete staff with an active user account. Please delete or deactivate the user account first.");
+            throw new Exception("Cannot delete staff with an active user account. Please deactivate the user account first.");
         }
 
-        // Remove from doctor table if exists
+        // Remove from doctor table
         $delete_doctor_sql = "DELETE FROM doctor WHERE doctor_id = :staff_id";
         $delete_doctor_stmt = $pdo->prepare($delete_doctor_sql);
         $delete_doctor_stmt->execute([':staff_id' => $id]);
@@ -486,15 +508,24 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
         $stmt = $pdo->prepare("UPDATE staff SET status = 0 WHERE id = :id");
         $stmt->execute([':id' => $id]);
 
+        if ($stmt->rowCount() === 0) {
+            throw new Exception("No staff member found with the specified ID or already inactive.");
+        }
+
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
         $pdo->rollBack();
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        if (isset($pdo)) {
+            $pdo->rollBack();
+        }
+        error_log("Unexpected error in delete staff: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+        echo json_encode(['success' => false, 'error' => 'An unexpected error occurred']);
     }
-    exit();
+    exit;
 }
-
 // Handle delete schedule action
 if (isset($_GET['action']) && $_GET['action'] == 'delete_schedule' && isset($_GET['id'])) {
     // Prevent any output before this point
@@ -538,8 +569,8 @@ $stmt = $pdo->query("SELECT d.doctor_id, s.name as doctor_name, dp.doctor_positi
                         a.id as assistant_id, a.name as assistant_name
                     FROM doctor d
                     JOIN staff s ON d.doctor_id = s.id
-                    LEFT JOIN doctor_position dp ON s.doctor_position_id = dp.id
-                    LEFT JOIN staff a ON d.assistant_id = a.id
+                    INNER JOIN doctor_position dp ON s.doctor_position_id = dp.id
+                    INNER JOIN staff a ON d.assistant_id = a.id
                     WHERE s.status = 1
                     ORDER BY s.name ASC");
 $doctors = $stmt->fetchAll();
@@ -548,7 +579,7 @@ $doctors = $stmt->fetchAll();
 $stmt = $pdo->query("
     SELECT s.*, d.name as doctor_name 
     FROM doctor_schedule s 
-    JOIN staff d ON s.doctor_id = d.id 
+    INNER JOIN staff d ON s.doctor_id = d.id 
     WHERE d.status = 1
     ORDER BY s.created_at DESC
 ");
@@ -557,7 +588,7 @@ $schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get staff without user accounts
 $stmt = $pdo->query("SELECT s.id, s.name 
                     FROM staff s 
-                    LEFT JOIN users u ON s.id = u.staff_id 
+                    INNER JOIN users u ON s.id = u.staff_id 
                     WHERE s.status = 1 AND u.id IS NULL 
                     ORDER BY s.name ASC");
 $staff_without_users = $stmt->fetchAll();
@@ -1290,32 +1321,48 @@ function toggleRoleFields() {
     const doctorPositionDiv = document.getElementById('doctorPositionDiv');
     doctorPositionDiv.classList.toggle('hidden', role !== 'doctor');
 }
-
 function deleteStaff(id) {
     if (confirm('Are you sure you want to mark this staff member as inactive?')) {
+        const button = document.querySelector(`#staff-row-${id} button[onclick="deleteStaff(${id})"]`);
+        const originalButtonHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.3"/><path fill="currentColor" d="M4 12a8 8 0 018-8v2a6 6 0 00-6 6h2z"/></svg>';
+
         fetch(`index.php?page=staff_management&action=delete&id=${id}`, {
             method: 'GET',
             headers: {
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok: ' + response.statusText);
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
-            return response.json();
+            return response.text();
         })
-        .then(data => {
-            if (data.success) {
-                document.getElementById(`staff-row-${id}`).remove();
-                alert('Staff member marked as inactive successfully');
-            } else {
-                alert('Error marking staff member as inactive: ' + data.error);
+        .then(text => {
+            try {
+                const data = JSON.parse(text);
+                if (data.success) {
+                    alert('Staff member marked as inactive successfully');
+                    location.reload();
+                } else {
+                    alert('Error marking staff member as inactive: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error('Failed to parse JSON. Raw response:', text);
+                console.error('Parse error:', e);
+                alert('Error marking staff member as inactive: Invalid server response');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Fetch error:', error);
             alert('Error marking staff member as inactive: ' + error.message);
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerHTML = originalButtonHTML;
         });
     }
 }

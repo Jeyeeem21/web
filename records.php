@@ -322,23 +322,34 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
 }
 
 // Handle delete user action
+// Handle delete user action
 if (isset($_GET['action']) && $_GET['action'] == 'delete_user' && isset($_GET['id'])) {
-    ob_end_clean();
+    // Clear any existing output buffers to prevent stray output
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Set JSON headers
     header('Content-Type: application/json; charset=utf-8');
+    
     $id = $_GET['id'];
     try {
         $pdo->beginTransaction();
         $stmt = $pdo->prepare("UPDATE users SET status = 0 WHERE id = :id");
         $stmt->execute([':id' => $id]);
         $pdo->commit();
+        
+        // Send JSON response and exit
         echo json_encode(['success' => true]);
+        exit();
     } catch (Exception $e) {
         $pdo->rollBack();
+        
+        // Send error JSON response and exit
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        exit();
     }
-    exit();
 }
-
 // Get all active patients
 try {
     $stmt = $pdo->query("SELECT * FROM patients WHERE status = 1 ORDER BY created_at DESC");
@@ -491,13 +502,13 @@ try {
                 <tbody class="divide-y divide-primary-100">
                     <?php
                     // Get all patient users
-                    $stmt = $pdo->query("
-                        SELECT u.*, p.name as patient_name 
-                        FROM users u 
-                        JOIN patients p ON u.patient_id = p.id 
-                        WHERE u.patient_id IS NOT NULL 
-                        ORDER BY u.id DESC
-                    ");
+                   $stmt = $pdo->query("
+    SELECT u.*, p.name as patient_name 
+    FROM users u 
+    INNER JOIN patients p ON u.patient_id = p.id 
+    WHERE u.patient_id IS NOT NULL AND u.status = 1
+    ORDER BY u.id DESC
+");
                     $patient_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     
                     foreach ($patient_users as $user): 
@@ -615,7 +626,7 @@ try {
                             $stmt = $pdo->query("
                                 SELECT p.* 
                                 FROM patients p 
-                                LEFT JOIN users u ON p.id = u.patient_id 
+                                INNER JOIN users u ON p.id = u.patient_id 
                                 WHERE p.status = 1 AND u.id IS NULL
                             ");
                             $patients_without_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -881,22 +892,28 @@ function deleteUser(id) {
                 'Accept': 'application/json'
             }
         })
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.text(); // Get raw text first
+        })
         .then(text => {
             try {
                 const data = JSON.parse(text);
                 if (data.success) {
-                    location.reload();
+                    location.reload(); // Reload to reflect updated user list
                 } else {
                     alert('Error deleting user account: ' + (data.error || 'Unknown error'));
                 }
             } catch (e) {
-                console.error('Failed to parse JSON:', text);
-                alert('Error deleting user account: Invalid server response');
+                console.error('Failed to parse JSON. Raw response:', text);
+                console.error('Parse error:', e);
+                alert('Error deleting user account: Invalid server response. Check console for details.');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Fetch error:', error);
             alert('Error deleting user account: ' + error.message);
         });
     }

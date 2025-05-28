@@ -1209,6 +1209,7 @@ const selectedDatePHT = '<?php echo $selectedDate; ?>'; // e.g., '2025-05-24'
 let todayStrPHT = serverPHTDate;
 let currentTimePHT = serverPHTTime;
 
+
 function openAppointmentModal(appointmentData = null) {
     // Reset form
     $('#appointmentForm')[0].reset();
