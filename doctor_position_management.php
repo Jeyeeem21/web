@@ -294,9 +294,7 @@ try {
             <li class="mr-2">
                 <a href="index.php?page=information" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Overview</a>
             </li>
-            <li class="mr-2">
-                <a href="index.php?page=home_management" class="inline-block p-3 text-secondary hover:text-primary-500 hover:bg-primary-50 hover:shadow-sm hover:scale-105 rounded-t-lg transition-all duration-200">Data</a>
-            </li>
+            
             <li class="mr-2">
                 <a href="index.php?page=doctor_position_management" class="inline-block p-3 bg-gradient-to-r from-primary-500 to-accent-300 text-white rounded-t-lg hover:brightness-110 hover:scale-105 transition-all duration-200">Services</a>
             </li>

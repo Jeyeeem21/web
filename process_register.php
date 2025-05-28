@@ -6,12 +6,12 @@ require_once 'config/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get and sanitize input data
-    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING);
-    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-    $phone = filter_input(INPUT_POST, 'phone', FILTER_SANITIZE_STRING);
-    $address = filter_input(INPUT_POST, 'address', FILTER_SANITIZE_STRING);
+    $name = filter_input(INPUT_POST, 'name' );
+    $email = filter_input(INPUT_POST, 'email');
+    $phone = filter_input(INPUT_POST, 'phone');
+    $address = filter_input(INPUT_POST, 'address');
     $birthdate = $_POST['birthdate'];
-    $gender = filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_STRING);
+    $gender = filter_input(INPUT_POST, 'gender');
     $status = 1; // Set status to 1 by default
 
     // Log received data

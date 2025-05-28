@@ -144,6 +144,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
     
     <!-- Tailwind CSS CDN with Custom Configuration -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -223,47 +224,52 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
         <div class="w-12 h-12 border-3 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
     </div>
 
-    <!-- Header -->
-    <header class="bg-white/95 backdrop-blur-md shadow-md fixed w-full top-0 z-50 animate-fade-in">
-        <nav class="container mx-auto px-6 py-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center">
-                    <a href="#" class="text-2xl font-heading font-bold text-primary-500"><?php echo htmlspecialchars($clinic['clinic_name']); ?></a>
-                </div>
-                <div class="flex items-center space-x-8">
-                    <div class="hidden md:flex space-x-8">
-                        <a href="#home" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="home">Home</a>
-                        <a href="#about" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="about">About</a>
-                        <a href="#services-doctors" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="services-doctors">Services & Doctors</a>
-                        <a href="#contact" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="contact">Contact</a>
-                    </div>
-                    <a href="login.php" class="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 hover:scale-110 transition-all duration-300 text-sm font-bold hover:shadow-lg">Login</a>
-                    <button class="md:hidden" id="mobile-menu-button" aria-label="Toggle mobile menu">
-                        <i class="fas fa-bars text-secondary text-xl"></i>
-                    </button>
-                </div>
+   <!-- Header -->
+<header class="bg-white/95 backdrop-blur-md shadow-md fixed w-full top-0 z-50 animate-fade-in">
+    <nav class="container mx-auto px-6 py-4">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <!-- Logo -->
+                <a href="#" class="flex items-center space-x-3">
+                    <img src="<?php echo htmlspecialchars($clinic['logo']); ?>" alt="<?php echo htmlspecialchars($clinic['clinic_name']); ?> Logo" class="h-10 w-10 object-contain rounded-full border-2 border-primary-100 hover:scale-110 transition-transform duration-300">
+                    <span class="text-2xl font-heading font-bold text-primary-500 hover:text-primary-600 transition-colors duration-300"><?php echo htmlspecialchars($clinic['clinic_name']); ?></span>
+                </a>
             </div>
-            <!-- Mobile Menu -->
-            <div class="md:hidden hidden" id="mobile-menu">
-                <div class="flex flex-col space-y-3 mt-4 pb-3">
+            <div class="flex items-center space-x-8">
+                <div class="hidden md:flex space-x-8">
                     <a href="#home" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="home">Home</a>
                     <a href="#about" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="about">About</a>
-                    <a href="#services-doctors" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="services-doctors">Services & Doctors</a>
+                    <a href="#services-doctors" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="services-doctors">Services</a>
                     <a href="#contact" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="contact">Contact</a>
                 </div>
+                <a href="login.php" class="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 hover:scale-105 transition-all duration-300 text-sm font-bold hover:shadow-lg flex items-center">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Login
+                </a>
+                <button class="md:hidden" id="mobile-menu-button" aria-label="Toggle mobile menu">
+                    <i class="fas fa-bars text-secondary text-xl hover:text-primary-500 transition-colors duration-300"></i>
+                </button>
             </div>
-        </nav>
-    </header>
-
+        </div>
+        <!-- Mobile Menu -->
+        <div class="md:hidden hidden" id="mobile-menu">
+            <div class="flex flex-col space-y-3 mt-4 pb-3 border-t border-primary-100 pt-4">
+                <a href="#home" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="home">Home</a>
+                <a href="#about" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="about">About</a>
+                <a href="#services-doctors" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="services-doctors">Services</a>
+                <a href="#contact" class="relative text-secondary hover:text-primary-500 transition-all duration-300 nav-link after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-primary-500 after:transition-all after:duration-300 hover:after:w-full text-base font-semibold" data-section="contact">Contact</a>
+            </div>
+        </div>
+    </nav>
+</header>
     <!-- Hero Section -->
     <section id="home" class="bg-cover bg-center min-h-[80vh] flex items-center justify-center text-center text-white relative animate-pulse-once" style="background-image: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url('<?php echo htmlspecialchars($home['homePic']); ?>');">
         <div class="container mx-auto px-6 relative z-10">
             <h1 class="text-4xl md:text-6xl font-heading font-extrabold leading-tight mb-4 animate-slide-up"><?php echo htmlspecialchars($home['maintext']); ?></h1>
             <p class="text-lg md:text-2xl font-semibold leading-relaxed mb-4 animate-slide-up animation-delay-100"><?php echo htmlspecialchars($home['secondtext']); ?></p>
             <p class="text-base md:text-lg font-medium leading-relaxed mb-6 animate-slide-up animation-delay-200"><?php echo htmlspecialchars($home['thirdtext']); ?></p>
-            <a href="#contact" class="inline-flex items-center bg-primary-500 text-white px-6 py-3 rounded-lg text-base font-bold hover:bg-primary-600 hover:scale-110 hover:shadow-lg transition-all duration-300 animate-slide-up animation-delay-300 hover:animate-bounce">
+            <button onclick="handleBookingClick()" class="inline-flex items-center bg-primary-500 text-white px-6 py-3 rounded-lg text-base font-bold hover:bg-primary-600 hover:scale-110 hover:shadow-lg transition-all duration-300 animate-slide-up animation-delay-300 hover:animate-bounce">
                 <i class="fas fa-calendar-check mr-2 text-lg"></i> Book Appointment
-            </a>
+            </button>
         </div>
     </section>
 
@@ -307,9 +313,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
                                     <p class="text-sm font-semibold text-neutral-dark"><?php echo htmlspecialchars($doctor['name']); ?></p>
                                     <span class="inline-block text-xs font-medium text-primary-500 bg-primary-100 px-2 py-1 rounded-full mt-1"><?php echo htmlspecialchars($doctor['position_name']); ?></span>
                                 </div>
-                                <a href="#contact" class="inline-flex items-center px-4 py-2 bg-accent-300 text-white rounded-lg hover:bg-accent-400 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce mx-auto md:mx-0" aria-label="Book with <?php echo htmlspecialchars($doctor['name']); ?>">
+                                <button onclick="handleBookingClick()" class="inline-flex items-center px-4 py-2 bg-accent-300 text-white rounded-lg hover:bg-accent-400 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce mx-auto md:mx-0" aria-label="Book with <?php echo htmlspecialchars($doctor['name']); ?>">
                                     <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
-                                </a>
+                                </button>
                             </div>
                             <?php endforeach; ?>
                         </div>
@@ -348,9 +354,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
                                     </p>
                                     <p class="text-sm font-semibold text-primary-500 text-center">₱<?php echo number_format($service['price'], 2); ?></p>
                                     <p class="text-xs font-medium text-secondary text-center"><?php echo htmlspecialchars($service['time']); ?></p>
-                                    <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce w-full justify-center" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                    <button onclick="handleBookingClick()" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce w-full justify-center" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
                                         <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
-                                    </a>
+                                    </button>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
@@ -379,9 +385,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
                                         <p class="text-xs font-medium text-secondary"><?php echo htmlspecialchars($service['time']); ?></p>
                                     </div>
                                     <div class="col-span-2 flex items-center">
-                                        <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                        <button onclick="handleBookingClick()" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
                                             <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
-                                        </a>
+                                        </button>
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
@@ -414,9 +420,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
                                 <p class="text-sm font-semibold text-neutral-dark"><?php echo htmlspecialchars($doctor['name']); ?></p>
                                 <span class="inline-block text-xs font-medium text-primary-500 bg-primary-100 px-2 py-1 rounded-full mt-1"><?php echo htmlspecialchars($doctor['position_name']); ?></span>
                             </div>
-                            <a href="#contact" class="inline-flex items-center px-4 py-2 bg-accent-300 text-white rounded-lg hover:bg-accent-400 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce mx-auto md:mx-0" aria-label="Book with <?php echo htmlspecialchars($doctor['name']); ?>">
+                            <button onclick="handleBookingClick()" class="inline-flex items-center px-4 py-2 bg-accent-300 text-white rounded-lg hover:bg-accent-400 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce mx-auto md:mx-0" aria-label="Book with <?php echo htmlspecialchars($doctor['name']); ?>">
                                 <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
-                            </a>
+                            </button>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -462,9 +468,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
                                 </p>
                                 <p class="text-sm font-semibold text-primary-500 text-center">₱<?php echo number_format($service['price'], 2); ?></p>
                                 <p class="text-xs font-medium text-secondary text-center"><?php echo htmlspecialchars($service['time']); ?></p>
-                                <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce w-full justify-center" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                <button onclick="handleBookingClick()" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce w-full justify-center" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
                                     <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
-                                </a>
+                                </button>
                             </div>
                             <?php endforeach; ?>
                         </div>
@@ -493,9 +499,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
                                     <p class="text-xs font-medium text-secondary"><?php echo htmlspecialchars($service['time']); ?></p>
                                 </div>
                                 <div class="col-span-2 flex items-center">
-                                    <a href="#contact" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
+                                    <button onclick="handleBookingClick()" class="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 hover:scale-110 hover:shadow-lg text-sm font-bold transition-all duration-300 hover:animate-bounce" aria-label="Book <?php echo htmlspecialchars($service['service_name']); ?>">
                                         <i class="fas fa-calendar-check mr-1 text-lg"></i> Book
-                                    </a>
+                                    </button>
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -582,6 +588,31 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_time_slots' && isset($_GET
     <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
 
     <script>
+        // Handle booking button click
+        // Handle booking button click with SweetAlert2
+function handleBookingClick() {
+    Swal.fire({
+        title: 'Do you have an account?',
+        text: 'Please confirm if you have an account or need to register.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, I have an account',
+        cancelButtonText: 'No, Register',
+        buttonsStyling: false,
+        customClass: {
+            confirmButton: 'bg-primary-500 text-white px-6 py-3 rounded-lg text-base font-bold hover:bg-primary-600 hover:scale-105 hover:shadow-lg transition-all duration-300 mr-2',
+            cancelButton: 'bg-accent-300 text-white px-6 py-3 rounded-lg text-base font-bold hover:bg-accent-400 hover:scale-105 hover:shadow-lg transition-all duration-300'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // User has an account, redirect to login
+            window.location.href = 'login.php';
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            // User needs to register, redirect to login with register form visible
+            window.location.href = 'login.php?show=register';
+        }
+    });
+}
         // Mobile menu toggle
         document.getElementById('mobile-menu-button').addEventListener('click', () => {
             document.getElementById('mobile-menu').classList.toggle('hidden');

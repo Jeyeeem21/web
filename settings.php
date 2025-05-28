@@ -120,7 +120,7 @@ $user = $stmt->fetch();
 
             <div class="flex justify-end space-x-4">
                 <input type="hidden" name="action" value="change_password">
-                <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 px-6 rounded-lg transition duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">Save Changes</button>
+                <button type="submit" class="bg-gradient-to-r from-primary-500 to-accent-300 text-white px-3 py-1.5 rounded-lg text-sm flex items-center hover:scale-105 transition-all duration-200">Save Changes</button>
             </div>
         </form>
     </div>
